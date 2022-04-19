@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: AGPL-2.0
+// SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.10;
 
 contract Module {
@@ -61,8 +61,7 @@ struct Instruction {
 }
 
 contract Kernel {
-    error Kernel_OnlyExecutive(address caller_);
-    error Kernel_KernelAlreadyLaunched(); // TODO
+    error Kernel_OnlyExecutor(address caller_);
     error Kernel_ModuleAlreadyInstalled(bytes3 module_);
     error Kernel_ModuleAlreadyExists(bytes3 module_);
     error Kernel_PolicyAlreadyApproved(address policy_);
@@ -74,8 +73,8 @@ contract Kernel {
         executive = msg.sender;
     }
 
-    modifier onlyExecutive() {
-        if (msg.sender != executive) revert Kernel_OnlyExecutive(msg.sender);
+    modifier onlyExecutor() {
+        if (msg.sender != executive) revert Kernel_OnlyExecutor(msg.sender);
         _;
     }
 
@@ -92,7 +91,7 @@ contract Kernel {
 
     function executeAction(Actions action_, address target_)
         external
-        onlyExecutive
+        onlyExecutor
     {
         if (action_ == Actions.InstallModule) {
             _installModule(target_);
@@ -103,9 +102,9 @@ contract Kernel {
         } else if (action_ == Actions.TerminatePolicy) {
             _terminatePolicy(target_);
         } else if (action_ == Actions.ChangeExecutor) {
-            // require Proxy to install the executive module before calling ChangeExecutive on it
-            if (getKeycodeForModule[target_] != "EXC")
-                revert Kernel_OnlyExecutive(target_);
+            // require Kernel to install the executor module before calling ChangeExecutor on it
+            if (getKeycodeForModule[target_] != "CPU")
+                revert Kernel_OnlyExecutor(target_);
 
             executive = target_;
         }

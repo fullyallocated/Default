@@ -5,13 +5,12 @@ import "../Kernel.sol";
 
 // CPU is the module that stores and executes batched instructions for the kernel
 contract Processor is Module {
+
     /////////////////////////////////////////////////////////////////////////////////
     //                           Proxy Proxy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-    constructor(Kernel kernel_) Kernel(kernel_) {
-        // instructionsForId[0];
-    }
+    constructor(Kernel kernel_) Kernel(kernel_) {}
 
     function KEYCODE() external pure override returns (bytes3) {
         return "CPU";
@@ -21,7 +20,7 @@ contract Processor is Module {
     //                              System Variables                               //
     /////////////////////////////////////////////////////////////////////////////////
 
-    /* imported from Proxy.sol
+    /* imported from Kernel.sol
 
   enum Actions {
     ChangeExecutive,

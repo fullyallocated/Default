@@ -103,7 +103,7 @@ contract Kernel {
             _terminatePolicy(target_);
         } else if (action_ == Actions.ChangeExecutor) {
             // require Kernel to install the executor module before calling ChangeExecutor on it
-            if (getKeycodeForModule[target_] != "CPU")
+            if (getKeycodeForModule[target_] != "GPU")
                 revert Kernel_OnlyExecutor(target_);
 
             executive = target_;

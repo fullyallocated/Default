@@ -3,8 +3,8 @@ pragma solidity ^0.8.10;
 
 import "../Kernel.sol";
 
-// CPU is the module that stores and executes batched instructions for the kernel
-contract Processor is Module {
+// GPU is the module that stores and executes batched instructions for the kernel
+contract Governance is Module {
 
     /////////////////////////////////////////////////////////////////////////////////
     //                           Proxy Proxy Configuration                         //
@@ -13,7 +13,7 @@ contract Processor is Module {
     constructor(Kernel kernel_) Kernel(kernel_) {}
 
     function KEYCODE() external pure override returns (bytes3) {
-        return "CPU";
+        return "GPU";
     }
 
     /////////////////////////////////////////////////////////////////////////////////

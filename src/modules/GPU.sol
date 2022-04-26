@@ -10,7 +10,7 @@ contract Governance is Module {
     //                           Proxy Proxy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-    constructor(Kernel kernel_) Kernel(kernel_) {}
+    constructor(Kernel kernel_) Module(kernel_) {}
 
     function KEYCODE() external pure override returns (bytes3) {
         return "GPU";
@@ -22,20 +22,22 @@ contract Governance is Module {
 
     /* imported from Kernel.sol
 
-  enum Actions {
-    ChangeExecutive,
-    ApprovePolicy,
-    TerminatePolicy,
-    InstallSystem,
-    UpgradeSystem
-  }
 
-  struct Instruction {
-    Actions action;
-    address target;
-  }
+    // TODO: Moved to Kernel, can remove
+    enum Actions {
+        ChangeExecutor,
+        ApprovePolicy,
+        TerminatePolicy,
+        InstallSystem,
+        UpgradeSystem
+    }
 
-  */
+    struct Instruction {
+        Actions action;
+        address target;
+    }
+
+    */
 
     uint256 public totalInstructions;
     mapping(uint256 => Instruction[]) public storedInstructions;
@@ -64,21 +66,21 @@ contract Governance is Module {
         for (uint256 i = 0; i < instructions_.length; i++) {
             _ensureContract(instructions_[i].target);
             if (
-                instructions_[i].action == Actions.InstallSystem ||
-                instructions_[i].action == Actions.UpgradeSystem
+                instructions_[i].action == Actions.InstallModule ||
+                instructions_[i].action == Actions.UpgradeModule
             ) {
                 bytes4 keycode = Module(instructions_[i].target).KEYCODE();
                 _ensureValidKeycode(keycode);
-                if (keycode == "CPU") {
+                if (keycode == "GPU") {
                     require(
                         instructions_[instructions_.length - 1].action ==
-                            Actions.ChangeExecutive,
-                        "cannot storeInstructions(): changes to the Executive system (EXC) requires changing the Kernel executive as the last step of the proposal"
+                            Actions.ChangeExecutor,
+                        "cannot storeInstructions(): changes to the Governance module (GPU) requires changing the Kernel executor as the last step of the proposal"
                     );
                     require(
                         instructions_[instructions_.length - 1].target ==
                             instructions_[i].target,
-                        "cannot storeInstructions(): changeExecutive target address does not match the upgraded Executive system address"
+                        "cannot storeInstructions(): changeExecutor target address does not match the upgraded Governance module address"
                     );
                 }
             }

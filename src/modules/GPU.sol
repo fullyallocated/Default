@@ -24,20 +24,20 @@ contract Governance is Module {
 
 
     // TODO: Moved to Kernel, can remove
-  enum Actions {
-    ChangeExecutor,
-    ApprovePolicy,
-    TerminatePolicy,
-    InstallSystem,
-    UpgradeSystem
-  }
+    enum Actions {
+        ChangeExecutor,
+        ApprovePolicy,
+        TerminatePolicy,
+        InstallSystem,
+        UpgradeSystem
+    }
 
-  struct Instruction {
-    Actions action;
-    address target;
-  }
+    struct Instruction {
+        Actions action;
+        address target;
+    }
 
-  */
+    */
 
     uint256 public totalInstructions;
     mapping(uint256 => Instruction[]) public storedInstructions;
@@ -71,16 +71,16 @@ contract Governance is Module {
             ) {
                 bytes4 keycode = Module(instructions_[i].target).KEYCODE();
                 _ensureValidKeycode(keycode);
-                if (keycode == "CPU") {
+                if (keycode == "GPU") {
                     require(
                         instructions_[instructions_.length - 1].action ==
                             Actions.ChangeExecutor,
-                        "cannot storeInstructions(): changes to the Executor module (EXC) requires changing the Kernel executor as the last step of the proposal"
+                        "cannot storeInstructions(): changes to the Governance module (GPU) requires changing the Kernel executor as the last step of the proposal"
                     );
                     require(
                         instructions_[instructions_.length - 1].target ==
                             instructions_[i].target,
-                        "cannot storeInstructions(): changeExecutor target address does not match the upgraded Executor module address"
+                        "cannot storeInstructions(): changeExecutor target address does not match the upgraded Governance module address"
                     );
                 }
             }

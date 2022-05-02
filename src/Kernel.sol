@@ -32,7 +32,7 @@ contract Policy {
     function requireModule(bytes3 keycode_) internal view returns (address) {
         address moduleForKeycode = _kernel.getModuleForKeycode(keycode_);
 
-        if (moduleForKeycode != address(0))
+        if (moduleForKeycode == address(0))
             revert Policy_ModuleDoesNotExist(keycode_);
 
         return moduleForKeycode;

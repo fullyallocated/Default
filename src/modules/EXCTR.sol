@@ -1,31 +1,33 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.10;
 
-import "../Kernel.sol";
+import {IKernel, Module, Instruction, Actions} from "../Kernel.sol";
 
-// GPU is the module that stores and executes batched instructions for the kernel
-contract Governance is Module {
+// Processor is the module that stores and executes batched instructions for the kernel
+contract Processor is Module {
+    error EXCTR_ProposalDoesNotExist();
+    error EXCTR_InstructionCannotBeEmpty();
+    error EXCTR_ProcessorChangeMustBeLast();
+    error EXCTR_AddressIsNotAContract(address target_);
+    error EXCTR_InvalidKeycode(bytes5 keycode_);
 
     /////////////////////////////////////////////////////////////////////////////////
-    //                           Proxy Proxy Configuration                         //
+    //                      DefaultOS Module Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-    constructor(Kernel kernel_) Module(kernel_) {}
+    constructor(IKernel kernel_) Module(kernel_) {}
 
-    function KEYCODE() external pure override returns (bytes3) {
-        return "GPU";
+    function KEYCODE() public pure override returns (bytes5) {
+        return "EXCTR";
     }
 
     /////////////////////////////////////////////////////////////////////////////////
     //                              System Variables                               //
     /////////////////////////////////////////////////////////////////////////////////
 
-    /* imported from Kernel.sol
-
-
-    // TODO: Moved to Kernel, can remove
+    /* 
     enum Actions {
-        ChangeExecutor,
+        ChangeExecutive,
         ApprovePolicy,
         TerminatePolicy,
         InstallSystem,
@@ -36,7 +38,6 @@ contract Governance is Module {
         Actions action;
         address target;
     }
-
     */
 
     uint256 public totalInstructions;
@@ -51,39 +52,31 @@ contract Governance is Module {
 
     function storeInstructions(Instruction[] calldata instructions_)
         external
-        onlyPolicy
+        onlyPermitted
         returns (uint256)
     {
+        uint256 length = instructions_.length;
         uint256 instructionsId = totalInstructions + 1;
         Instruction[] storage instructions = storedInstructions[instructionsId];
 
-        require(
-            instructions_.length > 0,
-            "cannot storeInstructions(): instructions cannot be empty"
-        );
+        if (length != 0) revert EXCTR_InstructionCannotBeEmpty();
 
         // @TODO use u256
-        for (uint256 i = 0; i < instructions_.length; i++) {
-            _ensureContract(instructions_[i].target);
+        for (uint256 i = 0; i < length; i++) {
+            Instruction calldata instruction = instructions_[i];
+            _ensureContract(instruction.target);
+
             if (
-                instructions_[i].action == Actions.InstallModule ||
-                instructions_[i].action == Actions.UpgradeModule
+                instruction.action == Actions.InstallModule ||
+                instruction.action == Actions.UpgradeModule
             ) {
-                bytes4 keycode = Module(instructions_[i].target).KEYCODE();
+                bytes5 keycode = Module(instruction.target).KEYCODE();
                 _ensureValidKeycode(keycode);
-                if (keycode == "GPU") {
-                    require(
-                        instructions_[instructions_.length - 1].action ==
-                            Actions.ChangeExecutor,
-                        "cannot storeInstructions(): changes to the Governance module (GPU) requires changing the Kernel executor as the last step of the proposal"
-                    );
-                    require(
-                        instructions_[instructions_.length - 1].target ==
-                            instructions_[i].target,
-                        "cannot storeInstructions(): changeExecutor target address does not match the upgraded Governance module address"
-                    );
-                }
+
+                if (keycode == "EXCTR" && length - 1 != i)
+                    revert EXCTR_ProcessorChangeMustBeLast();
             }
+
             instructions.push(instructions_[i]);
         }
         totalInstructions++;
@@ -93,13 +86,14 @@ contract Governance is Module {
         return instructionsId;
     }
 
-    function executeInstructions(uint256 instructionsId_) external onlyPolicy {
+    // TODO Add timelock
+    function executeInstructions(uint256 instructionsId_)
+        external
+        onlyPermitted
+    {
         Instruction[] storage proposal = storedInstructions[instructionsId_];
 
-        require(
-            proposal.length > 0,
-            "cannot executeInstructions(): proposal does not exist"
-        );
+        if (proposal.length > 0) revert EXCTR_ProposalDoesNotExist();
 
         for (uint256 step = 0; step < proposal.length; step++) {
             _kernel.executeAction(proposal[step].action, proposal[step].target);
@@ -115,19 +109,15 @@ contract Governance is Module {
         assembly {
             size := extcodesize(target_)
         }
-        require(
-            size > 0,
-            "cannot storeInstructions(): target address is not a contract"
-        );
+        if (size == 0) revert EXCTR_AddressIsNotAContract(target_);
     }
 
-    function _ensureValidKeycode(bytes4 keycode) internal pure {
-        for (uint256 i = 0; i < 3; i++) {
-            bytes1 char = keycode[i];
-            require(
-                char >= 0x41 && char <= 0x5A,
-                " cannot storeInstructions(): invalid keycode"
-            ); // A-Z only"
+    function _ensureValidKeycode(bytes5 keycode_) internal pure {
+        for (uint256 i = 0; i < 5; i++) {
+            bytes1 char = keycode_[i];
+            if (char < 0x41 || char > 0x5A)
+                revert EXCTR_InvalidKeycode(keycode_);
+            // A-Z only"
         }
     }
 }

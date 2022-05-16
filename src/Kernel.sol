@@ -13,7 +13,7 @@ abstract contract Module {
 
     function KEYCODE() public pure virtual returns (bytes5) {}
 
-    modifier onlyPermitted() {
+    modifier onlyPermittedPolicies() {
         if (_kernel.getWritePermissions(KEYCODE(), msg.sender) == false)
             revert Module_OnlyPermissionedPolicy(msg.sender);
         _;
@@ -133,8 +133,8 @@ contract Kernel is IKernel {
         } else if (action_ == Actions.TerminatePolicy) {
             _terminatePolicy(target_);
         } else if (action_ == Actions.ChangeExecutor) {
-            // Require kernel to install the EXCTR module before calling ChangeExecutor on it
-            if (getKeycodeForModule[target_] != "EXCTR")
+            // Require kernel to install the INSTR module before calling ChangeExecutor on it
+            if (getKeycodeForModule[target_] != "INSTR")
                 revert Kernel_OnlyExecutor(target_);
 
             executor = target_;

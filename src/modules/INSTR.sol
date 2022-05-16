@@ -10,7 +10,7 @@ contract Instructions is Module {
     error INSTR_InstructionCannotBeEmpty();
     error INSTR_InstructionsDoesNotExist();
     error INSTR_InstructionsModuleChangeMustBeLast();
-    error 
+    error INSTR_CannotExecuteInactiveInstructions();
     error INSTR_AddressIsNotAContract(address target_);
     error INSTR_InvalidKeycode(bytes5 keycode_);
 
@@ -44,17 +44,22 @@ contract Instructions is Module {
     }
     */
 
-    uint256 public totalInstructions;
-    uint256 public activeInstructionsId;
-    mapping(uint256 => Instruction[]) public storedInstructions;
+    struct ActiveInstructions {
+      uint256 instructionsId;
+      uint256 timestamp;
+    }
 
+    uint256 public totalInstructions;
+    ActiveInstructions public active;
+    mapping(uint256 => Instruction[]) public storedInstructions;
 
     /////////////////////////////////////////////////////////////////////////////////
     //                             Policy Interface                                //
     /////////////////////////////////////////////////////////////////////////////////
 
     event InstructionsStored(uint256 instructionsId);
-    event InstructionsActivated(uint256 instructionsId);
+    event InstructionsActivated(uint256 instructionsId, uint256 timestamp);
+    event InstructionsDeactivated(uint256 instructionsId);
     event InstructionsExecuted(uint256 instructionsId);
 
     function store(Instruction[] calldata instructions_) external onlyPermittedPolicies returns (uint256) {
@@ -97,18 +102,28 @@ contract Instructions is Module {
     function activate(uint256 instructionsId_) external onlyPermittedPolicies {
         Instruction[] memory instructions = storedInstructions[instructionsId_];
 
-        if (instructions.length > 0) revert INSTR_InstructionsDoesNotExist();
+        if (instructions.length == 0) revert INSTR_InstructionsDoesNotExist();
+        if (active.instructionsId == 0) revert INSTR_InstructionsDoesNotExist();
 
-        activeInstructionsId = instructionsId_;
+        active = ActiveInstructions(instructionsId_, block.timestamp);
 
-        emit InstructionsActivated(instructionsId_);
+        emit InstructionsActivated(instructionsId_, block.timestamp);
     }
 
 
-    function execute(uint256 instructionsId_) external onlyPermittedPolicies {
-        Instruction[] memory instructions = storedInstructions[instructionsId_];
+    function deactivate() external onlyPermittedPolicies {
+        uint256 instructions = active.instructionsId;
 
-        if (instructionsId_ != activeInstructionsId) revert INSTR_CannotExecuteInactiveInstructions();
+        emit InstructionsDeactivated(instructions, block.timestamp);
+
+        active = ActiveInstructions(0, 0);
+    }
+
+
+    function execute() external onlyPermittedPolicies {
+        Instruction[] memory instructions = storedInstructions[active.instructionsId];
+
+        if (active.instructionsId == 0) revert INSTR_CannotExecuteInactiveInstructions();
 
         for (uint256 step = 0; step < instructions.length; step++) {
             _kernel.executeAction(instructions[step].action, instructions[step].target);
@@ -128,7 +143,7 @@ contract Instructions is Module {
         }
         if (size == 0) revert INSTR_AddressIsNotAContract(target_);
     }
-    
+
 
     function _ensureValidKeycode(bytes5 keycode_) internal pure {
         for (uint256 i = 0; i < 5; i++) {

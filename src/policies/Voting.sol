@@ -42,9 +42,9 @@ contract Voting is Policy {
     uint256 public quoromThreshold = 2000; // 20%
     uint256 proposalExpiry = 604800; // 1 week in seconds 
 
-    mapping(uint256 => uint256) public getTotalYesVotesForInstructions;
-    mapping(uint256 => uint256) public getTotalNoVotesForInstructions;
-    mapping(address => mapping(uint256 => uint256)) public getUserVotesForInstructions;
+    mapping(uint256 => uint256) public totalYesVotesForInstructions;
+    mapping(uint256 => uint256) public totalNoVotesForInstructions;
+    mapping(address => mapping(uint256 => uint256)) public userVotesForInstructions;
 
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -73,25 +73,25 @@ contract Voting is Policy {
       uint256 expiry = active.timestamp + proposalExpiry;
 
       
-      if (active.instructionsId == 0) { revert Cannot_Cast_Multiple_Votes(); }
-      if (getUserVotesForInstructions[msg.sender][active.instructionsId] != 0) { revert Cannot_Cast_Multiple_Votes(); }
+      if (instructionsId == 0) { revert Cannot_Cast_Multiple_Votes(); }
+      if (userVotesForInstructions[msg.sender][instructionsId] != 0) { revert Cannot_Cast_Multiple_Votes(); }
 
       if (block.timestamp >= expiry) {
         INSTR.deactivate();
         return;
       }
 
-      getUserVotesForInstructions[msg.sender][active.instructionsId] = userVotes;
+      userVotesForInstructions[msg.sender][instructionsId] = userVotes;
 
       if (vote_ == true) {
-        getTotalYesVotesForInstructions[active.instructionsId] += userVotes;
+        totalYesVotesForInstructions[instructionsId] += userVotes;
       } else {
-        getTotalNoVotesForInstructions[active.instructionsId] += userVotes;
+        totalNoVotesForInstructions[instructionsId] += userVotes;
       }
 
-      uint256 totalVotesCasted = getTotalYesVotesForInstructions[active.instructionsId] + getTotalNoVotesForInstructions[active.instructionsId];
+      uint256 totalVotesCasted = totalYesVotesForInstructions[instructionsId] + totalNoVotesForInstructions[instructionsId];
       bool quorumFulfilled = (totalVotesCasted * 10000 / totalVotes) >= quoromThreshold;
-      bool isYesMajority = getTotalYesVotesForInstructions[active.instructionsId] > getTotalNoVotesForInstructions[active.instructionsId];
+      bool isYesMajority = totalYesVotesForInstructions[instructionsId] > totalNoVotesForInstructions[instructionsId];
 
       if (quorumFulfilled && isYesMajority) {
         INSTR.execute();

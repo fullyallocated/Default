@@ -33,7 +33,7 @@ abstract contract Policy {
     function getModuleAddress(bytes5 keycode_) internal view returns (address) {
         address moduleForKeycode = _kernel.getModuleForKeycode(keycode_);
 
-        if (moduleForKeycode != address(0))
+        if (moduleForKeycode == address(0))
             revert Policy_ModuleDoesNotExist(keycode_);
 
         return moduleForKeycode;

@@ -6,6 +6,8 @@ pragma solidity ^0.8.10;
 
 import {IKernel, Policy} from "../Kernel.sol";
 import '../modules/INSTR.sol';
+import '../modules/VOTES.sol';
+
 
 contract Governance is Policy {
 
@@ -15,21 +17,21 @@ contract Governance is Policy {
     /////////////////////////////////////////////////////////////////////////////////
 
 
-    INSTR private Instructions;
-    ROLES private Roles;
-
+    Instructions public INSTR;
+    Votes public VOTES;
 
     constructor(IKernel kernel_) Policy(kernel_) {}
 
 
     function configureReads() external override {
-      INSTR = INSTR(getModuleAddress("INSTR"));
-      VOTES = VOTES(getModuleAddress("VOTES")); 
+      INSTR = Instructions(getModuleAddress("INSTR"));
+      VOTES = Votes(getModuleAddress("VOTES")); 
     }
 
 
-    function requestWrites() external returns(bytes5[]) {
-      [ "INSTR" ];
+    function requestWrites() external view override onlyKernel returns(bytes5[] memory permissions) {
+      permissions = new bytes5[](1);
+      permissions[0] = "INSTR";
     }
 
 
@@ -41,14 +43,26 @@ contract Governance is Policy {
     event ProposalSubmitted(uint256 instructionsId);
     event ProposalEndorsed(uint256 instructionsId, address voter, uint256 amount);
     event ProposalActivated(uint256 instructionsId, uint timestamp);
+    event WalletVoted(uint256 instructionsId, address voter, uint256 userVotes);
+    event ProposalExecuted(uint256 instructionsId);
 
-
+    // proposing
     error Not_Enough_Votes_To_Propose();
+
+    // activating
     error Not_Authorized_To_Activate_Proposal();
     error Not_Enough_Endorsements_To_Activate_Proposal();
     error Active_Proposal_Not_Expired();
     error Proposal_Previously_Activated();
-    error Not_Enough_Votes_To_Propose();
+
+    // voting
+    error User_Already_Voted();
+
+    // executing
+    error Not_Enough_Votes_To_Execute();
+    error Active_Proposal_Not_Matured();
+
+    // claiming
     error Voting_Tokens_Already_Claimed();
     error Cannot_Claim_Active_Voting_Tokens();
 
@@ -66,10 +80,18 @@ contract Governance is Policy {
 
 
     ActivatedProposal public activeProposal;
+
     mapping(uint256 => Proposal) public getProposal;
+
     mapping(uint256 => uint256) public totalEndorsementsForProposal;
     mapping(uint256 => mapping(address => uint256)) public userEndorsementsForProposal;
     mapping(uint256 => bool) public getActivatedProposals;
+
+    mapping(uint256 => uint256) public yesVotesForProposal;
+    mapping(uint256 => uint256) public noVotesForProposal;
+    mapping(uint256 => mapping(address => uint256)) public userVotesForProposal;
+
+    mapping(uint256 => mapping(address => bool)) public tokenClaimsForProposal;
 
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -87,12 +109,12 @@ contract Governance is Policy {
       getProposal[instructionsId] = Proposal(proposalName_, msg.sender);
 
       // emit the corresponding event
-      emit ProposalSubmitted(instructionsId_);
+      emit ProposalSubmitted(instructionsId);
 
     }
 
 
-    function endorseProposal(instructionsId_) external {
+    function endorseProposal(uint256 instructionsId_) external {
 
       // get the current votes of the user
       uint256 userVotes = VOTES.balanceOf(msg.sender);
@@ -111,7 +133,7 @@ contract Governance is Policy {
     }
 
 
-    function activateProposal(instructionsId_) external {
+    function activateProposal(uint256 instructionsId_) external {
       
       // get the proposal to be activated
       Proposal memory proposal = getProposal[instructionsId_];
@@ -129,7 +151,7 @@ contract Governance is Policy {
       if (block.timestamp < activeProposal.timestamp + 1209600) { revert Active_Proposal_Not_Expired(); }
 
       // activate the proposal
-      activeProposal = ActivatedProposal(instructionsId_, VOTES.totalSupply(), block.timestamp);
+      activeProposal = ActivatedProposal(instructionsId_, block.timestamp);
 
       // record that the proposal has been activated
       getActivatedProposals[instructionsId_] = true;
@@ -143,7 +165,7 @@ contract Governance is Policy {
     function vote(bool for_) external {
       
       // get the amount of user votes
-      uint256 userVotes = VOTES.balanceOf(msg.sender)
+      uint256 userVotes = VOTES.balanceOf(msg.sender);
 
       // ensure the user has no pre-existing votes on the proposal
       if (userVotesForProposal[activeProposal.instructionsId][msg.sender] > 0) { revert User_Already_Voted(); }
@@ -156,7 +178,7 @@ contract Governance is Policy {
       VOTES.transferFrom(msg.sender, address(this), userVotes);
       
       // emit the corresponding event
-      emit UserVoted(activeProposal.instructionsId, msg.sender, userVotes);
+      emit WalletVoted(activeProposal.instructionsId, msg.sender, userVotes);
 
     }
 
@@ -174,7 +196,7 @@ contract Governance is Policy {
       INSTR.execute(activeProposal.instructionsId);
 
       // deactivate the active proposal
-      activeProposal = ActivatedProposal(0, 0, 0);
+      activeProposal = ActivatedProposal(0, 0);
 
       // emit the corresponding event
       emit ProposalExecuted(activeProposal.instructionsId);
@@ -194,7 +216,7 @@ contract Governance is Policy {
       if (tokenClaimsForProposal[instructionsId_][msg.sender] == true) { revert Voting_Tokens_Already_Claimed(); }
 
       // record the voting tokens being claimed from the contract
-      uint256 tokenClaimsForProposal[instructionsId_][msg.sender] = true;
+      tokenClaimsForProposal[instructionsId_][msg.sender] = true;
 
       // return the tokens back to the user
       VOTES.transfer(msg.sender, userVotes);

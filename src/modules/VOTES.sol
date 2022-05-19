@@ -5,10 +5,15 @@
 pragma solidity ^0.8.10;
 
 import {IKernel, Module} from "../Kernel.sol";
-import ERC20 from "@solmate/token";
+import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 
-contract VOTES is Module, ERC20("staked votes", VOTES) {
+contract Votes is Module, ERC20("Voting Tokens", "VOTES", 18) {
 
-  
+  constructor(IKernel kernel_) Module(kernel_) {}
+
+  function KEYCODE() public pure override returns (bytes5) {
+      return "VOTES";
+  }
+
 
 }

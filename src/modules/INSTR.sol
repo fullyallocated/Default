@@ -6,16 +6,12 @@ pragma solidity ^0.8.10;
 
 import {IKernel, Module, Instruction, Actions} from "../Kernel.sol";
 
+
 contract Instructions is Module {
-    error INSTR_InstructionCannotBeEmpty();
-    error INSTR_InstructionsDoesNotExist();
-    error INSTR_InstructionsModuleChangeMustBeLast();
-    error INSTR_CannotExecuteInactiveInstructions();
-    error INSTR_AddressIsNotAContract(address target_);
-    error INSTR_InvalidKeycode(bytes5 keycode_);
+
 
     /////////////////////////////////////////////////////////////////////////////////
-    //                      DefaultOS Module Configuration                         //
+    //                         Kernel Module Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
     constructor(IKernel kernel_) Module(kernel_) {}
@@ -25,8 +21,18 @@ contract Instructions is Module {
     }
 
     /////////////////////////////////////////////////////////////////////////////////
-    //                              System Variables                               //
+    //                              Module Variables                               //
     /////////////////////////////////////////////////////////////////////////////////
+
+
+    event InstructionsStored(uint256 instructionsId);
+    event InstructionsExecuted(uint256 instructionsId);
+
+    error Instructions_Cannot_Be_Empty();
+    error Instructions_Module_Must_Be_Last();
+    error Address_Is_Not_A_Contract(address target_);
+    error Invalid_Keycode(bytes5 keycode_);
+
 
     /* Imported from Kernel, just here for reference:
 
@@ -53,15 +59,13 @@ contract Instructions is Module {
     //                             Policy Interface                                //
     /////////////////////////////////////////////////////////////////////////////////
 
-    event InstructionsStored(uint256 instructionsId);
-    event InstructionsExecuted(uint256 instructionsId);
 
     function store(Instruction[] calldata instructions_) external onlyPermittedPolicies returns (uint256) {
         uint256 length = instructions_.length;
         uint256 instructionsId = totalInstructions + 1;
         Instruction[] storage instructions = storedInstructions[instructionsId];
 
-        if (length == 0) revert INSTR_InstructionCannotBeEmpty();
+        if (length == 0) revert Instructions_Cannot_Be_Empty();
 
         for (uint256 i = 0; i < length; i++) {
             Instruction calldata instruction = instructions_[i];
@@ -80,7 +84,7 @@ contract Instructions is Module {
                 Change executor to whitelist of addresses vs. single owner?
                 */
 
-                if (keycode == "INSTR" && length - 1 != i) revert INSTR_InstructionsModuleChangeMustBeLast();
+                if (keycode == "INSTR" && length - 1 != i) revert Instructions_Module_Must_Be_Last();
             }
 
             instructions.push(instructions_[i]);
@@ -93,10 +97,8 @@ contract Instructions is Module {
     }
 
 
-    function execute() external onlyPermittedPolicies {
-        Instruction[] memory instructions = storedInstructions[active.instructionsId];
-
-        if (active.instructionsId == 0) revert INSTR_CannotExecuteInactiveInstructions();
+    function execute(uint256 instructionsId_) external onlyPermittedPolicies {
+        Instruction[] memory instructions = storedInstructions[instructionsId_];
 
         for (uint256 step = 0; step < instructions.length; step++) {
             _kernel.executeAction(instructions[step].action, instructions[step].target);
@@ -114,7 +116,7 @@ contract Instructions is Module {
         assembly {
             size := extcodesize(target_)
         }
-        if (size == 0) revert INSTR_AddressIsNotAContract(target_);
+        if (size == 0) revert Address_Is_Not_A_Contract(target_);
     }
 
 
@@ -122,7 +124,7 @@ contract Instructions is Module {
         for (uint256 i = 0; i < 5; i++) {
             bytes1 char = keycode_[i];
             if (char < 0x41 || char > 0x5A)
-                revert INSTR_InvalidKeycode(keycode_);
+                revert Invalid_Keycode(keycode_);
             // A-Z only"
         }
     }

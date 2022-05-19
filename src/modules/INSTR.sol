@@ -44,22 +44,16 @@ contract Instructions is Module {
     }
     */
 
-    struct ActiveInstructions {
-      uint256 instructionsId;
-      uint256 timestamp;
-    }
 
     uint256 public totalInstructions;
-    ActiveInstructions public active;
     mapping(uint256 => Instruction[]) public storedInstructions;
+
 
     /////////////////////////////////////////////////////////////////////////////////
     //                             Policy Interface                                //
     /////////////////////////////////////////////////////////////////////////////////
 
     event InstructionsStored(uint256 instructionsId);
-    event InstructionsActivated(uint256 instructionsId, uint256 timestamp);
-    event InstructionsDeactivated(uint256 instructionsId);
     event InstructionsExecuted(uint256 instructionsId);
 
     function store(Instruction[] calldata instructions_) external onlyPermittedPolicies returns (uint256) {
@@ -96,27 +90,6 @@ contract Instructions is Module {
         emit InstructionsStored(instructionsId);
 
         return instructionsId;
-    }
-
-
-    function activate(uint256 instructionsId_) external onlyPermittedPolicies {
-        Instruction[] memory instructions = storedInstructions[instructionsId_];
-
-        if (instructions.length == 0) revert INSTR_InstructionsDoesNotExist();
-        if (active.instructionsId == 0) revert INSTR_InstructionsDoesNotExist();
-
-        active = ActiveInstructions(instructionsId_, block.timestamp);
-
-        emit InstructionsActivated(instructionsId_, block.timestamp);
-    }
-
-
-    function deactivate() external onlyPermittedPolicies {
-        uint256 instructions = active.instructionsId;
-
-        emit InstructionsDeactivated(instructions, block.timestamp);
-
-        active = ActiveInstructions(0, 0);
     }
 
 

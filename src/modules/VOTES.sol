@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// [INSTR] The Instructions Module caches and executes batched instructions for protocol upgrades in the Kernel
+// [VOTES] The Votes Module is the ERC20 token that represents voting power in the network
 
 pragma solidity ^0.8.10;
 

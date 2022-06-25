@@ -4,9 +4,11 @@
 
 pragma solidity ^0.8.13;
 
-import {Kernel, Policy, Actions, Instruction} from "../Kernel.sol";
+import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
+
 import {Instructions} from "src/modules/INSTR.sol";
-import {Votes} from "src/modules/VOTES.sol";
+import {Token} from "src/modules/TOKEN.sol";
+import {Kernel, Policy, Actions, Instruction} from "src/Kernel.sol";
 
 // proposing
 error NotEnoughVotesToPropose();
@@ -46,18 +48,20 @@ struct ActivatedProposal {
 }
 
 contract Governance is Policy {
+    using FixedPointMathLib for uint256;
+
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
     Instructions public INSTR;
-    Votes public VOTES;
+    Token public VOTES;
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureReads() external override {
         INSTR = Instructions(getModuleAddress("INSTR"));
-        VOTES = Votes(getModuleAddress("VOTES"));
+        VOTES = Token(getModuleAddress("VOTES"));
     }
 
     function requestRoles()
@@ -89,6 +93,9 @@ contract Governance is Policy {
         uint256 userVotes
     );
     event ProposalExecuted(uint256 instructionsId);
+
+    // Reward for vote participation. 4 decimals.
+    uint256 public rewardRate;
 
     // currently active proposal
     ActivatedProposal public activeProposal;
@@ -224,7 +231,7 @@ contract Governance is Policy {
         // get the amount of user votes
         uint256 userVotes = VOTES.balanceOf(msg.sender);
 
-        // // ensure an active proposal exists
+        // ensure an active proposal exists
         if (activeProposal.instructionsId == 0) {
             revert NoActiveProposalDetected();
         }
@@ -300,19 +307,23 @@ contract Governance is Policy {
         uint256 userVotes = userVotesForProposal[instructionsId_][msg.sender];
 
         // ensure the user is not claiming for the active propsal
-        if (instructionsId_ == activeProposal.instructionsId) {
+        if (instructionsId_ == activeProposal.instructionsId)
             revert CannotReclaimTokensForActiveVote();
-        }
 
         // ensure the user has not already claimed before for this proposal
-        if (tokenClaimsForProposal[instructionsId_][msg.sender] == true) {
+        if (tokenClaimsForProposal[instructionsId_][msg.sender] == true)
             revert VotingTokensAlreadyClaimed();
-        }
 
-        // record the voting tokens being claimed from the contract
+        // Record the voting tokens being claimed from the contract
         tokenClaimsForProposal[instructionsId_][msg.sender] = true;
+
+        // Get voting reward according to reward rate
+        uint256 voteReward = (userVotes * (10000 + rewardRate)) / 1e4;
+        // TODO can do this on first claim for a proposal to mint entire
+        // reward for all votes.
 
         // return the tokens back to the user
         VOTES.transfer(msg.sender, userVotes);
+        VOTES.mintTo(msg.sender, voteReward);
     }
 }

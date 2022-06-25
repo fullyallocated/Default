@@ -11,13 +11,11 @@ import {Governance} from "src/policies/Governance.sol";
 
 contract Deploy is Script {
 
-    Kernel public kernel;
-
     function run() external {
         vm.startBroadcast();
 
         // deploy kernel
-        kernel = new Kernel();
+        Kernel kernel = new Kernel();
         console2.log("Kernel deployed at:", address(kernel));
 
         // deploy modules

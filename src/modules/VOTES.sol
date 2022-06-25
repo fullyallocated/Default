@@ -5,13 +5,12 @@ import {ERC20} from "solmate/tokens/ERC20.sol";
 import {Kernel, Module} from "src/Kernel.sol";
 
 // [VOTES] The Votes Module is the ERC20 token that represents voting power in the network.
-// This is currently a subtitute module that stubs gOHM.
 contract Votes is Module, ERC20 {
     Kernel.Role public constant ISSUER = Kernel.Role.wrap("VOTES_Issuer");
 
     constructor(Kernel kernel_)
         Module(kernel_)
-        ERC20("OlympusDAO Dummy Voting Tokens", "VOTES", 0)
+        ERC20("Voting Tokens", "VOTES", 18)
     {}
 
     function KEYCODE() public pure override returns (Kernel.Keycode) {

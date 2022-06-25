@@ -2,19 +2,18 @@
 pragma solidity ^0.8.13;
 
 import {ERC20} from "solmate/tokens/ERC20.sol";
+
 import {Kernel, Module} from "src/Kernel.sol";
 
-// [VOTES] The Votes Module is the ERC20 token that represents voting power in the network.
-contract Votes is Module, ERC20 {
-    Kernel.Role public constant ISSUER = Kernel.Role.wrap("VOTES_Issuer");
+contract Token is Module, ERC20 {
+    Kernel.Role public constant ISSUER = Kernel.Role.wrap("TOKEN_Issuer");
 
-    constructor(Kernel kernel_)
-        Module(kernel_)
-        ERC20("Voting Tokens", "VOTES", 18)
-    {}
+    uint256 public rewardRate;
+
+    constructor(Kernel kernel_) Module(kernel_) ERC20("Token", "TOKEN", 18) {}
 
     function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.Keycode.wrap("VOTES");
+        return Kernel.Keycode.wrap("TOKEN");
     }
 
     function ROLES() public pure override returns (Kernel.Role[] memory roles) {

@@ -43,7 +43,7 @@ contract Governance is Policy {
     event ProposalSubmitted(uint256 instructionsId);
     event ProposalEndorsed(uint256 instructionsId, address voter, uint256 amount);
     event ProposalActivated(uint256 instructionsId, uint timestamp);
-    event WalletVoted(uint256 instructionsId, address voter, uint256 userVotes);
+    event WalletVoted(uint256 instructionsId, address voter, uint256 userVotes, bool vote);
     event ProposalExecuted(uint256 instructionsId);
 
     // proposing
@@ -178,7 +178,7 @@ contract Governance is Policy {
       VOTES.transferFrom(msg.sender, address(this), userVotes);
       
       // emit the corresponding event
-      emit WalletVoted(activeProposal.instructionsId, msg.sender, userVotes);
+      emit WalletVoted(activeProposal.instructionsId, msg.sender, userVotes, for_);
 
     }
 

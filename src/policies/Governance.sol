@@ -4,8 +4,6 @@
 
 pragma solidity ^0.8.13;
 
-import {FixedPointMathLib} from "solmate/utils/FixedPointMathLib.sol";
-
 import {Instructions} from "src/modules/INSTR.sol";
 import {Token} from "src/modules/TOKEN.sol";
 import {Kernel, Policy, Actions, Instruction} from "src/Kernel.sol";
@@ -48,20 +46,19 @@ struct ActivatedProposal {
 }
 
 contract Governance is Policy {
-    using FixedPointMathLib for uint256;
 
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
     Instructions public INSTR;
-    Token public VOTES;
+    Token public TOKEN;
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureReads() external override {
         INSTR = Instructions(getModuleAddress("INSTR"));
-        VOTES = Token(getModuleAddress("VOTES"));
+        TOKEN = Token(getModuleAddress("VOTES"));
     }
 
     function requestRoles()
@@ -138,7 +135,7 @@ contract Governance is Policy {
         bytes32 proposalName_
     ) external {
         // require the proposing wallet to own at least 1% of the outstanding governance power
-        if (VOTES.balanceOf(msg.sender) * 100 < VOTES.totalSupply()) {
+        if (TOKEN.balanceOf(msg.sender) * 100 < TOKEN.totalSupply()) {
             revert NotEnoughVotesToPropose();
         }
 
@@ -156,7 +153,7 @@ contract Governance is Policy {
 
     function endorseProposal(uint256 instructionsId_) external {
         // get the current votes of the user
-        uint256 userVotes = VOTES.balanceOf(msg.sender);
+        uint256 userVotes = TOKEN.balanceOf(msg.sender);
 
         // revert if endorsing null instructionsId
         if (instructionsId_ == 0) {
@@ -202,7 +199,7 @@ contract Governance is Policy {
         // require endorsements from at least 20% of the total outstanding governance power
         if (
             (totalEndorsementsForProposal[instructionsId_] * 5) <
-            VOTES.totalSupply()
+            TOKEN.totalSupply()
         ) {
             revert NotEnoughEndorsementsToActivateProposal();
         }
@@ -229,7 +226,7 @@ contract Governance is Policy {
 
     function vote(bool for_) external {
         // get the amount of user votes
-        uint256 userVotes = VOTES.balanceOf(msg.sender);
+        uint256 userVotes = TOKEN.balanceOf(msg.sender);
 
         // ensure an active proposal exists
         if (activeProposal.instructionsId == 0) {
@@ -256,7 +253,7 @@ contract Governance is Policy {
         ] = userVotes;
 
         // transfer voting tokens to contract
-        VOTES.transferFrom(msg.sender, address(this), userVotes);
+        TOKEN.transferFrom(msg.sender, address(this), userVotes);
 
         // emit the corresponding event
         emit WalletVoted(
@@ -273,7 +270,7 @@ contract Governance is Policy {
             (yesVotesForProposal[activeProposal.instructionsId] -
                 noVotesForProposal[activeProposal.instructionsId]) *
                 3 <
-            VOTES.totalSupply()
+            TOKEN.totalSupply()
         ) {
             revert NotEnoughVotesToExecute();
         }
@@ -320,10 +317,10 @@ contract Governance is Policy {
         // Get voting reward according to reward rate
         uint256 voteReward = (userVotes * (10000 + rewardRate)) / 1e4;
         // TODO can do this on first claim for a proposal to mint entire
-        // reward for all votes.
+        // reward for all TOKEN.
 
         // return the tokens back to the user
-        VOTES.transfer(msg.sender, userVotes);
-        VOTES.mintTo(msg.sender, voteReward);
+        TOKEN.transfer(msg.sender, userVotes);
+        TOKEN.mintTo(msg.sender, voteReward);
     }
 }

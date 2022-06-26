@@ -61,7 +61,7 @@ contract Governance is Policy {
 
     function configureReads() external override {
         INSTR = Instructions(getModuleAddress("INSTR"));
-        VOTES = Token(getModuleAddress("VOTES"));
+        VOTES = Token(getModuleAddress("TOKEN"));
     }
 
     function requestRoles()

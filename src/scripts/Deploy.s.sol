@@ -4,8 +4,8 @@ pragma solidity 0.8.13;
 import {Script, console2} from "forge-std/Script.sol";
 
 import {Kernel, Actions} from "src/Kernel.sol";
-import {Instructions} from "src/modules/INSTR.sol";
 
+import {Instructions} from "src/modules/INSTR.sol";
 import {Token} from "src/modules/TOKEN.sol";
 import {Authorization} from "src/modules/AUTHR.sol";
 import {Treasury} from "src/modules/TRSRY.sol";

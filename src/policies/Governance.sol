@@ -133,7 +133,7 @@ contract Governance is Policy {
     function submitProposal(
         Instruction[] calldata instructions_,
         bytes32 proposalName_
-    ) external {
+    ) external returns (uint256) {
         // require the proposing wallet to own at least 1% of the outstanding governance power
         if (TOKEN.balanceOf(msg.sender) * 100 < TOKEN.totalSupply()) {
             revert NotEnoughVotesToPropose();
@@ -149,6 +149,7 @@ contract Governance is Policy {
 
         // emit the corresponding event
         emit ProposalSubmitted(instructionsId);
+        return instructionsId;
     }
 
     function endorseProposal(uint256 instructionsId_) external {

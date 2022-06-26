@@ -5,7 +5,7 @@
 pragma solidity ^0.8.13;
 
 import {Token} from "src/modules/TOKEN.sol";
-import {Kernel, Policy} from "src/Kernel.sol";
+import {Kernel, Policy, Module} from "src/Kernel.sol";
 
 
 contract Faucet is Policy {

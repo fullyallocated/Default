@@ -1,0 +1,8 @@
+[default]
+solc_version = "0.8.13"
+remappings = [
+    'ds-test/=lib/ds-test/src/',
+    'solmate/=lib/solmate/src/',
+    'forge-std/=lib/forge-std/src/',
+    'test-utils/=lib/test-utils/src/',
+]

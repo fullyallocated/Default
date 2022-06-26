@@ -1,60 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.10;
+pragma solidity ^0.8.13;
 
-abstract contract Module {
-    error Module_OnlyApprovedPolicy(address caller_);
-    error Module_OnlyPermissionedPolicy(address caller_);
+// ######################## ~ ERRORS ~ ########################
 
-    IKernel public _kernel;
+// MODULE
 
-    constructor(IKernel kernel_) {
-        _kernel = kernel_;
-    }
+error Module_NotAuthorized();
 
-    function KEYCODE() public pure virtual returns (bytes5) {}
+// POLICY
 
-    modifier onlyPermittedPolicies() {
-        if (_kernel.getWritePermissions(KEYCODE(), msg.sender) == false)
-            revert Module_OnlyPermissionedPolicy(msg.sender);
-        _;
-    }
-}
+error Policy_ModuleDoesNotExist(Kernel.Keycode keycode_);
+error Policy_OnlyKernel(address caller_);
 
-abstract contract Policy {
-    error Policy_ModuleDoesNotExist(bytes5 keycode_);
-    error Policy_OnlyKernel(address caller_);
+// KERNEL
 
-    IKernel public _kernel;
+error Kernel_OnlyExecutor(address caller_);
+error Kernel_ModuleAlreadyInstalled(Kernel.Keycode module_);
+error Kernel_ModuleAlreadyExists(Kernel.Keycode module_);
+error Kernel_PolicyAlreadyApproved(address policy_);
+error Kernel_PolicyNotApproved(address policy_);
 
-    constructor(IKernel kernel_) {
-        _kernel = kernel_;
-    }
-
-    function getModuleAddress(bytes5 keycode_) internal view returns (address) {
-        address moduleForKeycode = _kernel.getModuleForKeycode(keycode_);
-
-        if (moduleForKeycode == address(0))
-            revert Policy_ModuleDoesNotExist(keycode_);
-
-        return moduleForKeycode;
-    }
-
-    function configureReads() external virtual onlyKernel {}
-
-    function requestWrites()
-        external
-        view
-        virtual
-        onlyKernel
-        returns (bytes5[] memory permissions)
-    {}
-
-    modifier onlyKernel() {
-        if (msg.sender != address(_kernel))
-            revert Policy_OnlyKernel(msg.sender);
-        _;
-    }
-}
+// ######################## ~ GLOBAL TYPES ~ ########################
 
 enum Actions {
     InstallModule,
@@ -69,56 +35,117 @@ struct Instruction {
     address target;
 }
 
-// Core kernel functions for modules and policies to work
-interface IKernel {
-    function getWritePermissions(bytes5 keycode_, address caller_)
-        external
-        view
-        returns (bool);
+// ######################## ~ CONTRACT TYPES ~ ########################
 
-    function getModuleForKeycode(bytes5 keycode_)
-        external
-        view
-        returns (address);
+abstract contract Module {
+    Kernel public kernel;
 
-    function executeAction(Actions action_, address target_) external;
+    constructor(Kernel kernel_) {
+        kernel = kernel_;
+    }
+
+    modifier onlyRole(Kernel.Role role_) {
+        if (kernel.hasRole(msg.sender, role_) == false) {
+            revert Module_NotAuthorized();
+        }
+        _;
+    }
+
+    function KEYCODE() public pure virtual returns (Kernel.Keycode);
+
+    function ROLES() public pure virtual returns (Kernel.Role[] memory roles);
+
+    /// @notice Specify which version of a module is being implemented.
+    /// @dev Minor version change retains interface. Major version upgrade indicates
+    ///      breaking change to the interface.
+    function VERSION()
+        external
+        pure
+        virtual
+        returns (uint8 major, uint8 minor)
+    {}
+
+    function INIT() external virtual {}
 }
 
-contract Kernel is IKernel {
-    event Kernel_WritePermissionsUpdated(
-        bytes5 indexed keycode_,
-        address indexed policy_,
-        bool enabled_
-    );
+abstract contract Policy {
+    Kernel public kernel;
 
-    error Kernel_OnlyExecutor(address caller_);
-    error Kernel_ModuleAlreadyInstalled(bytes5 module_);
-    error Kernel_ModuleAlreadyExists(bytes5 module_);
-    error Kernel_PolicyAlreadyApproved(address policy_);
-    error Kernel_PolicyNotApproved(address policy_);
+    constructor(Kernel kernel_) {
+        kernel = kernel_;
+    }
+
+    modifier onlyKernel() {
+        if (msg.sender != address(kernel)) revert Policy_OnlyKernel(msg.sender);
+        _;
+    }
+
+    function configureReads() external virtual onlyKernel {}
+
+    function requestRoles()
+        external
+        view
+        virtual
+        returns (Kernel.Role[] memory roles)
+    {}
+
+    function getModuleAddress(bytes5 keycode_) internal view returns (address) {
+        Kernel.Keycode keycode = Kernel.Keycode.wrap(keycode_);
+        address moduleForKeycode = kernel.getModuleForKeycode(keycode);
+
+        if (moduleForKeycode == address(0))
+            revert Policy_ModuleDoesNotExist(keycode);
+
+        return moduleForKeycode;
+    }
+}
+
+contract Kernel {
+    // ######################## ~ TYPES ~ ########################
+
+    type Role is bytes32;
+    type Keycode is bytes5;
+
+    // ######################## ~ VARS ~ ########################
 
     address public executor;
+
+    // ######################## ~ DEPENDENCY MANAGEMENT ~ ########################
+
+    address[] public allPolicies;
+
+    mapping(Keycode => address) public getModuleForKeycode; // get contract for module keycode
+
+    mapping(address => Keycode) public getKeycodeForModule; // get module keycode for contract
+
+    mapping(address => bool) public approvedPolicies; // whitelisted apps
+
+    mapping(address => mapping(Role => bool)) public hasRole;
+
+    // ######################## ~ EVENTS ~ ########################
+
+    event RolesUpdated(
+        Role indexed role_,
+        address indexed policy_,
+        bool indexed granted_
+    );
+
+    event ActionExecuted(Actions indexed action_, address indexed target_);
+
+    // ######################## ~ BODY ~ ########################
 
     constructor() {
         executor = msg.sender;
     }
+
+    // ######################## ~ MODIFIERS ~ ########################
 
     modifier onlyExecutor() {
         if (msg.sender != executor) revert Kernel_OnlyExecutor(msg.sender);
         _;
     }
 
-    ///////////////////////////////////////////////////////////////////////////////////////
-    //                                 DEPENDENCY MANAGEMENT                             //
-    ///////////////////////////////////////////////////////////////////////////////////////
-
-    mapping(bytes5 => address) public getModuleForKeycode; // get contract for module keycode
-    mapping(address => bytes5) public getKeycodeForModule; // get module keycode for contract
-    mapping(address => bool) public approvedPolicies; // whitelisted apps
-    mapping(bytes5 => mapping(address => bool)) public getWritePermissions; // can module (bytes5) be written to by policy (address)
-    address[] public allPolicies;
-
-    event ActionExecuted(Actions action_, address target_);
+    // ######################## ~ KERNEL INTERFACE ~ ########################
 
     function executeAction(Actions action_, address target_)
         external
@@ -133,18 +160,16 @@ contract Kernel is IKernel {
         } else if (action_ == Actions.TerminatePolicy) {
             _terminatePolicy(target_);
         } else if (action_ == Actions.ChangeExecutor) {
-            // Require kernel to install the INSTR module before calling ChangeExecutor on it
-            if (getKeycodeForModule[target_] != "INSTR")
-                revert Kernel_OnlyExecutor(target_);
-
             executor = target_;
         }
 
         emit ActionExecuted(action_, target_);
     }
 
+    // ######################## ~ KERNEL INTERNAL ~ ########################
+
     function _installModule(address newModule_) internal {
-        bytes5 keycode = Module(newModule_).KEYCODE();
+        Keycode keycode = Module(newModule_).KEYCODE();
 
         // @NOTE check newModule_ != 0
         if (getModuleForKeycode[keycode] != address(0))
@@ -155,13 +180,13 @@ contract Kernel is IKernel {
     }
 
     function _upgradeModule(address newModule_) internal {
-        bytes5 keycode = Module(newModule_).KEYCODE();
+        Keycode keycode = Module(newModule_).KEYCODE();
         address oldModule = getModuleForKeycode[keycode];
 
         if (oldModule == address(0) || oldModule == newModule_)
             revert Kernel_ModuleAlreadyExists(keycode);
 
-        getKeycodeForModule[oldModule] = bytes5(0);
+        getKeycodeForModule[oldModule] = Keycode.wrap(bytes5(0));
         getKeycodeForModule[newModule_] = keycode;
         getModuleForKeycode[keycode] = newModule_;
 
@@ -176,8 +201,9 @@ contract Kernel is IKernel {
 
         Policy(policy_).configureReads();
 
-        bytes5[] memory permissions = Policy(policy_).requestWrites();
-        _setWritePermissions(policy_, permissions, true);
+        Role[] memory requests = Policy(policy_).requestRoles();
+
+        _setPolicyRoles(policy_, requests, true);
 
         allPolicies.push(policy_);
     }
@@ -188,8 +214,9 @@ contract Kernel is IKernel {
 
         approvedPolicies[policy_] = false;
 
-        bytes5[] memory permissions = Policy(policy_).requestWrites();
-        _setWritePermissions(policy_, permissions, false);
+        Role[] memory requests = Policy(policy_).requestRoles();
+
+        _setPolicyRoles(policy_, requests, false);
     }
 
     function _reconfigurePolicies() internal {
@@ -201,18 +228,23 @@ contract Kernel is IKernel {
         }
     }
 
-    function _setWritePermissions(
+    function _setPolicyRoles(
         address policy_,
-        bytes5[] memory keycodes_,
-        bool canWrite_
+        Role[] memory requests_,
+        bool grant_
     ) internal {
-        for (uint256 i = 0; i < keycodes_.length; i++) {
-            getWritePermissions[keycodes_[i]][policy_] = canWrite_;
-            emit Kernel_WritePermissionsUpdated(
-                keycodes_[i],
-                policy_,
-                canWrite_
-            );
+        uint256 l = requests_.length;
+
+        for (uint256 i = 0; i < l; ) {
+            Role request = requests_[i];
+
+            hasRole[policy_][request] = grant_;
+
+            emit RolesUpdated(request, policy_, grant_);
+
+            unchecked {
+                i++;
+            }
         }
     }
 }

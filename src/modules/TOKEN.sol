@@ -10,7 +10,7 @@ contract Token is Module, ERC20 {
 
     uint256 public rewardRate;
 
-    constructor(Kernel kernel_) Module(kernel_) ERC20("Token", "TOKEN", 18) {}
+    constructor(Kernel kernel_) Module(kernel_) ERC20("Token", "TOKEN", 0) {}
 
     function KEYCODE() public pure override returns (Kernel.Keycode) {
         return Kernel.Keycode.wrap("TOKEN");

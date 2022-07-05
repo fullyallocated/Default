@@ -64,8 +64,6 @@ abstract contract Module {
         virtual
         returns (uint8 major, uint8 minor)
     {}
-
-    function INIT() external virtual {}
 }
 
 abstract contract Policy {

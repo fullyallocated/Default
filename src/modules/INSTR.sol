@@ -4,14 +4,14 @@
 
 pragma solidity ^0.8.13;
 
-import {Kernel, Module, Actions, Instruction} from "src/Kernel.sol";
+import "src/Kernel.sol";
 
 error INSTR_InstructionsCannotBeEmpty();
 error INSTR_InvalidChangeExecutorAction();
 error INSTR_InvalidTargetNotAContract();
 error INSTR_InvalidModuleKeycode();
 
-contract Instructions is Module {
+contract DefaultInstructions is Module {
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Module Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
@@ -29,23 +29,20 @@ contract Instructions is Module {
         roles[0] = GOVERNOR;
     }
 
-    function INIT() external override {}
-
     /////////////////////////////////////////////////////////////////////////////////
     //                              Module Variables                               //
     /////////////////////////////////////////////////////////////////////////////////
 
     event InstructionsStored(uint256 instructionsId);
-    event InstructionsExecuted(uint256 instructionsId);
 
     /* Imported from Kernel, just here for reference:
 
     enum Actions {
-        ChangeExecutive,
+        InstallModule,
+        UpgradeModule,
         ApprovePolicy,
         TerminatePolicy,
-        InstallSystem,
-        UpgradeSystem
+        ChangeExecutor
     }
 
     struct Instruction {
@@ -76,12 +73,10 @@ contract Instructions is Module {
         returns (uint256)
     {
         uint256 length = instructions_.length;
-        totalInstructions++;
+        uint256 instructionsId = ++totalInstructions;
 
         // initialize an empty list of instructions that will be filled
-        Instruction[] storage instructions = storedInstructions[
-            totalInstructions
-        ];
+        Instruction[] storage instructions = storedInstructions[instructionsId];
 
         // if there are no instructions, throw an error
         if (length == 0) {
@@ -89,7 +84,7 @@ contract Instructions is Module {
         }
 
         // for each instruction, do the following actions:
-        for (uint256 i = 0; i < length; i++) {
+        for (uint256 i; i < length; ) {
             // get the instruction
             Instruction calldata instruction = instructions_[i];
 
@@ -116,11 +111,12 @@ contract Instructions is Module {
             }
 
             instructions.push(instructions_[i]);
+            unchecked { ++i; }
         }
 
-        emit InstructionsStored(totalInstructions);
+        emit InstructionsStored(instructionsId);
 
-        return totalInstructions;
+        return instructionsId;
     }
 
     /////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
@@ -141,9 +137,7 @@ contract Instructions is Module {
 
             if (char < 0x41 || char > 0x5A) revert INSTR_InvalidModuleKeycode(); // A-Z only"
 
-            unchecked {
-                i++;
-            }
+            unchecked { i++; }
         }
     }
 }

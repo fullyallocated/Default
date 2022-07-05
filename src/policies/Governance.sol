@@ -5,8 +5,8 @@
 pragma solidity ^0.8.13;
 
 import {Kernel, Policy} from "../Kernel.sol";
-import {DefaultInstructions, Actions, Instruction} from "../modules/INSTR.sol";
-import {DefaultVotes} from "../modules/VOTES.sol";
+import {OlympusInstructions, Actions, Instruction} from "modules/INSTR.sol";
+import {OlympusVotes} from "modules/VOTES.sol";
 
 // proposing
 error NotEnoughVotesToPropose();
@@ -52,17 +52,16 @@ contract Governance is Policy {
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-    DefaultInstructions public INSTR;
-    DefaultVotes public VOTES;
+    OlympusInstructions public INSTR;
+    OlympusVotes public VOTES;
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureReads() external override {
-        INSTR = DefaultInstructions(getModuleAddress("INSTR"));
-        VOTES = DefaultVotes(getModuleAddress("VOTES"));
+        INSTR = OlympusInstructions(getModuleAddress("INSTR"));
+        VOTES = OlympusVotes(getModuleAddress("VOTES"));
     }
 
-    // The Governor Policy is also the Kernel's Executor.
     function requestRoles()
         external
         view
@@ -73,6 +72,7 @@ contract Governance is Policy {
         roles = new Kernel.Role[](2);
         roles[0] = INSTR.GOVERNOR();
         roles[1] = VOTES.GOVERNOR();
+        // This Governor Policy is also the Executor for the Kernel.
     }
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -322,6 +322,6 @@ contract Governance is Policy {
         tokenClaimsForProposal[instructionsId_][msg.sender] = true;
 
         // return the tokens back to the user
-        VOTES.transfer(msg.sender, userVotes);
+        VOTES.transferFrom(address(this), msg.sender, userVotes);
     }
 }

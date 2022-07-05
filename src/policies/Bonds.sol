@@ -1,12 +1,38 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
-// The Governance Policy submits & activates instructions in a INSTR module
+// The Bonds Policy sells PRXY tokens in a modified Dutch Auction mechanism for price discovery.
+
+// Proxy Bonds have the following properties:
+// - The price for PRXY tokens increases by the 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 pragma solidity ^0.8.13;
 
 import {Kernel, Policy} from "../Kernel.sol";
-import {OlympusInstructions, Actions, Instruction} from "modules/INSTR.sol";
-import {OlympusVotes} from "modules/VOTES.sol";
+import {DefaultInstructions, Actions, Instruction} from "../modules/INSTR.sol";
+import {DefaultVotes} from "../modules/VOTES.sol";
 
 // proposing
 error NotEnoughVotesToPropose();
@@ -52,16 +78,17 @@ contract Governance is Policy {
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-    OlympusInstructions public INSTR;
-    OlympusVotes public VOTES;
+    DefaultInstructions public INSTR;
+    DefaultVotes public VOTES;
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureReads() external override {
-        INSTR = OlympusInstructions(getModuleAddress("INSTR"));
-        VOTES = OlympusVotes(getModuleAddress("VOTES"));
+        INSTR = DefaultInstructions(getModuleAddress("INSTR"));
+        VOTES = DefaultVotes(getModuleAddress("VOTES"));
     }
 
+    // The Governor Policy is also the Kernel's Executor.
     function requestRoles()
         external
         view
@@ -72,7 +99,6 @@ contract Governance is Policy {
         roles = new Kernel.Role[](2);
         roles[0] = INSTR.GOVERNOR();
         roles[1] = VOTES.GOVERNOR();
-        // This Governor Policy is also the Executor for the Kernel.
     }
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -322,6 +348,6 @@ contract Governance is Policy {
         tokenClaimsForProposal[instructionsId_][msg.sender] = true;
 
         // return the tokens back to the user
-        VOTES.transferFrom(address(this), msg.sender, userVotes);
+        VOTES.transfer(msg.sender, userVotes);
     }
 }

@@ -5,8 +5,8 @@
 pragma solidity ^0.8.13;
 
 import {Kernel, Policy} from "../Kernel.sol";
-import {OlympusInstructions, Actions, Instruction} from "modules/INSTR.sol";
-import {OlympusVotes} from "modules/VOTES.sol";
+import {DefaultInstructions, Actions, Instruction} from "../modules/INSTR.sol";
+import {DefaultVotes} from "../modules/VOTES.sol";
 
 // proposing
 error NotEnoughVotesToPropose();
@@ -52,14 +52,14 @@ contract Governance is Policy {
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-    OlympusInstructions public INSTR;
-    OlympusVotes public VOTES;
+    DefaultInstructions public INSTR;
+    DefaultVotes public VOTES;
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureReads() external override {
-        INSTR = OlympusInstructions(getModuleAddress("INSTR"));
-        VOTES = OlympusVotes(getModuleAddress("VOTES"));
+        INSTR = DefaultInstructions(getModuleAddress("INSTR"));
+        VOTES = DefaultVotes(getModuleAddress("VOTES"));
     }
 
     function requestRoles()

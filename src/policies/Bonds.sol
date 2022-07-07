@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-
 // Proxy Bonds are a modified gradual dutch auction mechanism for protocols to sell their native tokens.
+
+pragma solidity ^0.8.13;
+
+error notEnoughLiquidity();
+error executionPriceTooHigh();
 
 contract DefaultBonds {
 
@@ -35,10 +39,10 @@ contract DefaultBonds {
     uint256 executionPrice = basePrice - priceDecay + (demandPremium/2);
 
     // revert if the execution price is worse than the minPrice_
-    if (executionPrice > maxPrice_) { revert priceTooHigh(); }
+    if (executionPrice > maxPrice_) { revert executionPriceTooHigh(); }
 
     // calculate the new liquidity remaining in the auctions after the sale is complete
-    totalLiquidityAvailable = totalLiquidityAvailable + newLiquidity - amt_; 
+    availableLiquidity = availableLiquidity + additionalLiquidity - amt_; 
 
     // reset the last purchase timestamp
     lastPurchaseTimestamp = block.timestamp;
@@ -50,6 +54,6 @@ contract DefaultBonds {
     residualTokens = (amt_ + residualTokens) % 500; 
 
     // calculate the total price for the size of the order and transfer it to the treasury.
-    TRSRY.depositFrom(msg.sender, executionPrice * amt_);
+    // TRSRY.depositFrom(msg.sender, executionPrice * amt_); // no TRSRY module yet
   }
 }

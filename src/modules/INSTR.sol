@@ -1,143 +1,140 @@
-// SPDX-License-Identifier: AGPL-3.0-only
+// // SPDX-License-Identifier: AGPL-3.0-only
 
-// [INSTR] The Instructions Module caches and executes batched instructions for protocol upgrades in the Kernel
+// // [INSTR] The Instructions Module caches and executes batched instructions for protocol upgrades in the Kernel
 
-pragma solidity ^0.8.13;
+// pragma solidity ^0.8.13;
 
-import "src/Kernel.sol";
+// import "src/Kernel.sol";
 
-error INSTR_InstructionsCannotBeEmpty();
-error INSTR_InvalidChangeExecutorAction();
-error INSTR_InvalidTargetNotAContract();
-error INSTR_InvalidModuleKeycode();
+// error INSTR_InstructionsCannotBeEmpty();
+// error INSTR_InvalidChangeExecutorAction();
+// error INSTR_InvalidTargetNotAContract();
+// error INSTR_InvalidModuleKeycode();
 
-contract DefaultInstructions is Module {
-    /////////////////////////////////////////////////////////////////////////////////
-    //                         Kernel Module Configuration                         //
-    /////////////////////////////////////////////////////////////////////////////////
+// contract DefaultInstructions is Module {
+//     /////////////////////////////////////////////////////////////////////////////////
+//     //                         Kernel Module Configuration                         //
+//     /////////////////////////////////////////////////////////////////////////////////
 
-    Kernel.Role public constant GOVERNOR = Kernel.Role.wrap("INSTR_Governor");
 
-    constructor(Kernel kernel_) Module(kernel_) {}
+//     Kernel.Role public constant GOVERNOR = Kernel.Role.wrap("INSTR_Governor");
 
-    function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.Keycode.wrap("INSTR");
-    }
+//     constructor(Kernel kernel_) Module(kernel_) {}
 
-    function ROLES() public pure override returns (Kernel.Role[] memory roles) {
-        roles = new Kernel.Role[](1);
-        roles[0] = GOVERNOR;
-    }
+//     function KEYCODE() public pure override returns (Kernel.Keycode) {
+//         return Kernel.Keycode.wrap("INSTR");
+//     }
 
-    /////////////////////////////////////////////////////////////////////////////////
-    //                              Module Variables                               //
-    /////////////////////////////////////////////////////////////////////////////////
 
-    event InstructionsStored(uint256 instructionsId);
+//     /////////////////////////////////////////////////////////////////////////////////
+//     //                              Module Variables                               //
+//     /////////////////////////////////////////////////////////////////////////////////
 
-    /* Imported from Kernel, just here for reference:
+//     event InstructionsStored(uint256 instructionsId);
 
-    enum Actions {
-        InstallModule,
-        UpgradeModule,
-        ApprovePolicy,
-        TerminatePolicy,
-        ChangeExecutor
-    }
+//     /* Imported from Kernel, just here for reference:
 
-    struct Instruction {
-        Actions action;
-        address target;
-    }
-    */
+//     enum Actions {
+//         InstallModule,
+//         UpgradeModule,
+//         ApprovePolicy,
+//         TerminatePolicy,
+//         ChangeExecutor
+//     }
 
-    uint256 public totalInstructions;
-    mapping(uint256 => Instruction[]) public storedInstructions;
+//     struct Instruction {
+//         Actions action;
+//         address target;
+//     }
+//     */
 
-    /////////////////////////////////////////////////////////////////////////////////
-    //                             Policy Interface                                //
-    /////////////////////////////////////////////////////////////////////////////////
+//     uint256 public totalInstructions;
+//     mapping(uint256 => Instruction[]) public storedInstructions;
 
-    // view function for retrieving a list of instructions in an outside contract
-    function getInstructions(uint256 instructionsId_)
-        public
-        view
-        returns (Instruction[] memory)
-    {
-        return storedInstructions[instructionsId_];
-    }
+//     /////////////////////////////////////////////////////////////////////////////////
+//     //                             Policy Interface                                //
+//     /////////////////////////////////////////////////////////////////////////////////
 
-    function store(Instruction[] calldata instructions_)
-        external
-        onlyRole(GOVERNOR)
-        returns (uint256)
-    {
-        uint256 length = instructions_.length;
-        uint256 instructionsId = ++totalInstructions;
+//     // view function for retrieving a list of instructions in an outside contract
+//     function getInstructions(uint256 instructionsId_)
+//         public
+//         view
+//         returns (Instruction[] memory)
+//     {
+//         return storedInstructions[instructionsId_];
+//     }
 
-        // initialize an empty list of instructions that will be filled
-        Instruction[] storage instructions = storedInstructions[instructionsId];
+//     function store(Instruction[] calldata instructions_)
+//         external
+//         permissioned(store.selector)
+//         returns (uint256)
+//     {
+//         uint256 length = instructions_.length;
+//         uint256 instructionsId = ++totalInstructions;
 
-        // if there are no instructions, throw an error
-        if (length == 0) {
-            revert INSTR_InstructionsCannotBeEmpty();
-        }
+//         // initialize an empty list of instructions that will be filled
+//         Instruction[] storage instructions = storedInstructions[instructionsId];
 
-        // for each instruction, do the following actions:
-        for (uint256 i; i < length; ) {
-            // get the instruction
-            Instruction calldata instruction = instructions_[i];
+//         // if there are no instructions, throw an error
+//         if (length == 0) {
+//             revert INSTR_InstructionsCannotBeEmpty();
+//         }
 
-            // check the address that the instruction is being performed on is a contract (bytecode size > 0)
-            _ensureContract(instruction.target);
+//         // for each instruction, do the following actions:
+//         for (uint256 i; i < length; ) {
+//             // get the instruction
+//             Instruction calldata instruction = instructions_[i];
 
-            // if the instruction deals with a module, make sure the module has a valid keycode (UPPERCASE A-Z ONLY)
-            if (
-                instruction.action == Actions.InstallModule ||
-                instruction.action == Actions.UpgradeModule
-            ) {
-                Module module = Module(instruction.target);
-                _ensureValidKeycode(module.KEYCODE());
-            } else if (
-                instruction.action == Actions.ChangeExecutor && i != length - 1
-            ) {
-                // throw an error if ChangeExecutor exists and is not the last Action in the instruction llist
-                // this exists because if ChangeExecutor is not the last item in the list of instructions
-                // the Kernel will not recognize any of the following instructions as valid, since the policy
-                // executing the list of instructions no longer has permissions in the Kernel. To avoid this issue
-                // and prevent invalid proposals from being saved, we perform this check.
+//             // check the address that the instruction is being performed on is a contract (bytecode size > 0)
+//             _ensureContract(instruction.target);
 
-                revert INSTR_InvalidChangeExecutorAction();
-            }
+//             // if the instruction deals with a module, make sure the module has a valid keycode (UPPERCASE A-Z ONLY)
+//             if (
+//                 instruction.action == Actions.InstallModule ||
+//                 instruction.action == Actions.UpgradeModule
+//             ) {
+//                 Module module = Module(instruction.target);
+//                 _ensureValidKeycode(module.KEYCODE());
+//             } else if (
+//                 instruction.action == Actions.ChangeExecutor && i != length - 1
+//             ) {
+//                 // throw an error if ChangeExecutor exists and is not the last Action in the instruction llist
+//                 // this exists because if ChangeExecutor is not the last item in the list of instructions
+//                 // the Kernel will not recognize any of the following instructions as valid, since the policy
+//                 // executing the list of instructions no longer has permissions in the Kernel. To avoid this issue
+//                 // and prevent invalid proposals from being saved, we perform this check.
 
-            instructions.push(instructions_[i]);
-            unchecked { ++i; }
-        }
+//                 revert INSTR_InvalidChangeExecutorAction();
+//             }
 
-        emit InstructionsStored(instructionsId);
+//             instructions.push(instructions_[i]);
+//             unchecked { ++i; }
+//         }
 
-        return instructionsId;
-    }
+//         emit InstructionsStored(instructionsId);
 
-    /////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
+//         return instructionsId;
+//     }
 
-    function _ensureContract(address target_) internal view {
-        uint256 size;
-        assembly {
-            size := extcodesize(target_)
-        }
-        if (size == 0) revert INSTR_InvalidTargetNotAContract();
-    }
+//     /////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
 
-    function _ensureValidKeycode(Kernel.Keycode keycode_) internal pure {
-        bytes5 unwrapped = Kernel.Keycode.unwrap(keycode_);
+//     function _ensureContract(address target_) internal view {
+//         uint256 size;
+//         assembly {
+//             size := extcodesize(target_)
+//         }
+//         if (size == 0) revert INSTR_InvalidTargetNotAContract();
+//     }
 
-        for (uint256 i = 0; i < 5; ) {
-            bytes1 char = unwrapped[i];
+//     function _ensureValidKeycode(Kernel.Keycode keycode_) internal pure {
+//         bytes5 unwrapped = Kernel.Keycode.unwrap(keycode_);
 
-            if (char < 0x41 || char > 0x5A) revert INSTR_InvalidModuleKeycode(); // A-Z only"
+//         for (uint256 i = 0; i < 5; ) {
+//             bytes1 char = unwrapped[i];
 
-            unchecked { i++; }
-        }
-    }
-}
+//             if (char < 0x41 || char > 0x5A) revert INSTR_InvalidModuleKeycode(); // A-Z only"
+
+//             unchecked { i++; }
+//         }
+//     }
+// }

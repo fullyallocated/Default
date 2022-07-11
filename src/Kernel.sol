@@ -5,7 +5,7 @@ pragma solidity ^0.8.13;
 
 // MODULE
 
-error Module_NotAuthorized();
+error Module_PolicyNotAuthorized();
 
 // POLICY
 
@@ -35,7 +35,12 @@ struct Instruction {
     address target;
 }
 
-// ######################## ~ CONTRACT TYPES ~ ########################
+struct RequestPermissions {
+    Kernel.Keycode keycode;
+    bytes4 funcSelector;
+}
+
+// ######################## ~ MODULE ABSTRACT ~ ########################
 
 abstract contract Module {
     Kernel public kernel;
@@ -44,16 +49,15 @@ abstract contract Module {
         kernel = kernel_;
     }
 
-    modifier onlyRole(Kernel.Role role_) {
-        if (kernel.hasRole(msg.sender, role_) == false) {
-            revert Module_NotAuthorized();
-        }
-        _;
+    modifier permissioned(bytes4 funcSelector_) {
+      Kernel.Keycode keycode = KEYCODE();
+      if (kernel.policyPermissions(msg.sender, keycode, funcSelector_) == false) {
+        revert Module_PolicyNotAuthorized();
+      }
+      _;
     }
 
     function KEYCODE() public pure virtual returns (Kernel.Keycode);
-
-    function ROLES() public pure virtual returns (Kernel.Role[] memory roles);
 
     /// @notice Specify which version of a module is being implemented.
     /// @dev Minor version change retains interface. Major version upgrade indicates
@@ -80,11 +84,11 @@ abstract contract Policy {
 
     function configureReads() external virtual onlyKernel {}
 
-    function requestRoles()
+    function requestPermissions()
         external
         view
         virtual
-        returns (Kernel.Role[] memory roles)
+        returns (RequestPermissions[] memory requests)
     {}
 
     function getModuleAddress(bytes5 keycode_) internal view returns (address) {
@@ -99,32 +103,25 @@ abstract contract Policy {
 }
 
 contract Kernel {
-    // ######################## ~ TYPES ~ ########################
-
-    type Role is bytes32;
-    type Keycode is bytes5;
-
     // ######################## ~ VARS ~ ########################
 
+    type Keycode is bytes5;
     address public executor;
 
     // ######################## ~ DEPENDENCY MANAGEMENT ~ ########################
 
+    mapping(Keycode => address) public getModuleForKeycode; // get contract for module keycode
+    mapping(address => Keycode) public getKeycodeForModule; // get module keycode for contract
+    mapping(address => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
     address[] public allPolicies;
 
-    mapping(Keycode => address) public getModuleForKeycode; // get contract for module keycode
-
-    mapping(address => Keycode) public getKeycodeForModule; // get module keycode for contract
-
-    mapping(address => bool) public approvedPolicies; // whitelisted apps
-
-    mapping(address => mapping(Role => bool)) public hasRole;
 
     // ######################## ~ EVENTS ~ ########################
 
-    event RolesUpdated(
-        Role indexed role_,
+    event PermissionsUpated(
         address indexed policy_,
+        Keycode indexed keycode_,
+        bytes4 funcSelector_,
         bool indexed granted_
     );
 
@@ -192,53 +189,39 @@ contract Kernel {
     }
 
     function _approvePolicy(address policy_) internal {
-        if (approvedPolicies[policy_] == true)
-            revert Kernel_PolicyAlreadyApproved(policy_);
-
-        approvedPolicies[policy_] = true;
-
         Policy(policy_).configureReads();
 
-        Role[] memory requests = Policy(policy_).requestRoles();
-
-        _setPolicyRoles(policy_, requests, true);
+        RequestPermissions[] memory requests = Policy(policy_).requestPermissions();
+        _setPolicyPermissions(policy_, requests, true);
 
         allPolicies.push(policy_);
     }
 
     function _terminatePolicy(address policy_) internal {
-        if (approvedPolicies[policy_] == false)
-            revert Kernel_PolicyNotApproved(policy_);
-
-        approvedPolicies[policy_] = false;
-
-        Role[] memory requests = Policy(policy_).requestRoles();
-
-        _setPolicyRoles(policy_, requests, false);
+        RequestPermissions[] memory requests = Policy(policy_).requestPermissions();
+        _setPolicyPermissions(policy_, requests, false);
     }
 
     function _reconfigurePolicies() internal {
         for (uint256 i = 0; i < allPolicies.length; i++) {
             address policy_ = allPolicies[i];
 
-            if (approvedPolicies[policy_] == true)
-                Policy(policy_).configureReads();
+            // if (approvedPolicies[policy_] == true)
+            //     Policy(policy_).configureReads();
         }
     }
 
-    function _setPolicyRoles(
+    function _setPolicyPermissions(
         address policy_,
-        Role[] memory requests_,
+        RequestPermissions[] memory requests_,
         bool grant_
     ) internal {
-        uint256 l = requests_.length;
+        for (uint256 i = 0; i < requests_.length; ) {
+            RequestPermissions memory request = requests_[i];
 
-        for (uint256 i = 0; i < l; ) {
-            Role request = requests_[i];
+            policyPermissions[policy_][request.keycode][request.funcSelector] = grant_;
 
-            hasRole[policy_][request] = grant_;
-
-            emit RolesUpdated(request, policy_, grant_);
+            emit PermissionsUpated(policy_, request.keycode, request.funcSelector, grant_);
 
             unchecked {
                 i++;

@@ -91,12 +91,11 @@ abstract contract Policy {
         returns (RequestPermissions[] memory requests)
     {}
 
-    function getModuleAddress(bytes5 keycode_) internal view returns (address) {
-        Kernel.Keycode keycode = Kernel.Keycode.wrap(keycode_);
-        address moduleForKeycode = kernel.getModuleForKeycode(keycode);
+    function getModuleAddress(Kernel.Keycode keycode_) internal view returns (address) {
+        address moduleForKeycode = kernel.getModuleForKeycode(keycode_);
 
         if (moduleForKeycode == address(0))
-            revert Policy_ModuleDoesNotExist(keycode);
+            revert Policy_ModuleDoesNotExist(keycode_);
 
         return moduleForKeycode;
     }

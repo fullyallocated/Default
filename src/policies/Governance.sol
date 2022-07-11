@@ -61,8 +61,8 @@ contract Governance is Policy {
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureReads() external override {
-        INSTR = DefaultInstructions(getModuleAddress("INSTR"));
-        VOTES = DefaultVotes(getModuleAddress("VOTES"));
+        INSTR = DefaultInstructions(getModuleAddress(Kernel.Keycode.wrap("INSTR")));
+        VOTES = DefaultVotes(getModuleAddress(Kernel.Keycode.wrap("VOTES")));
     }
 
     function requestPermissions()

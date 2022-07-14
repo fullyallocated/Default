@@ -35,7 +35,6 @@ error VotingTokensAlreadyReclaimed();
 error CannotReclaimTokensForActiveVote();
 error CannotReclaimZeroVotes();
 
-
 struct ProposalMetadata {
     bytes32 proposalName;
     address proposer;
@@ -48,21 +47,26 @@ struct ActivatedProposal {
 }
 
 contract Governance is Policy {
-
-
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
-
 
     DefaultInstructions public INSTR;
     DefaultVotes public VOTES;
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
-    function configureReads() external override {
+    function updateDependencies()
+        external
+        override
+        returns (Kernel.Keycode[] memory dependencies)
+    {
         INSTR = DefaultInstructions(getModuleAddress(Kernel.Keycode.wrap("INSTR")));
         VOTES = DefaultVotes(getModuleAddress(Kernel.Keycode.wrap("VOTES")));
+
+        dependencies = new Kernel.Keycode[](2);
+        dependencies[0] = _toKeycode("INSTR");
+        dependencies[1] = _toKeycode("VOTES");
     }
 
     function requestPermissions()
@@ -73,16 +77,23 @@ contract Governance is Policy {
         returns (RequestPermissions[] memory requests)
     {
         requests = new RequestPermissions[](3);
-        requests[0] = RequestPermissions(Kernel.Keycode.wrap("INSTR"), INSTR.store.selector);
-        requests[1] = RequestPermissions(Kernel.Keycode.wrap("VOTES"), VOTES.mintTo.selector);
-        requests[2] = RequestPermissions(Kernel.Keycode.wrap("VOTES"), VOTES.burnFrom.selector);
+        requests[0] = RequestPermissions(
+            Kernel.Keycode.wrap("INSTR"),
+            INSTR.store.selector
+        );
+        requests[1] = RequestPermissions(
+            Kernel.Keycode.wrap("VOTES"),
+            VOTES.mintTo.selector
+        );
+        requests[2] = RequestPermissions(
+            Kernel.Keycode.wrap("VOTES"),
+            VOTES.burnFrom.selector
+        );
     }
-
 
     /////////////////////////////////////////////////////////////////////////////////
     //                             Policy Variables                                //
     /////////////////////////////////////////////////////////////////////////////////
-
 
     event ProposalSubmitted(uint256 instructionsId);
     event ProposalEndorsed(
@@ -99,14 +110,14 @@ contract Governance is Policy {
     );
     event ProposalExecuted(uint256 instructionsId);
 
-
     // currently active proposal
     ActivatedProposal public activeProposal;
 
     mapping(uint256 => ProposalMetadata) public getProposalMetadata;
 
     mapping(uint256 => uint256) public totalEndorsementsForProposal;
-    mapping(uint256 => mapping(address => uint256)) public userEndorsementsForProposal;
+    mapping(uint256 => mapping(address => uint256))
+        public userEndorsementsForProposal;
     mapping(uint256 => bool) public proposalHasBeenActivated;
 
     mapping(uint256 => uint256) public yesVotesForProposal;
@@ -115,11 +126,9 @@ contract Governance is Policy {
 
     mapping(uint256 => mapping(address => bool)) public tokenClaimsForProposal;
 
-
     /////////////////////////////////////////////////////////////////////////////////
     //                               User Actions                                  //
     /////////////////////////////////////////////////////////////////////////////////
-
 
     function getMetadata(uint256 instructionsId_)
         public
@@ -216,7 +225,7 @@ contract Governance is Policy {
             revert ProposalAlreadyActivated();
         }
 
-        // ensure the currently active proposal has had at least a week of voting for execution 
+        // ensure the currently active proposal has had at least a week of voting for execution
         if (block.timestamp < activeProposal.activationTimestamp + 1 weeks) {
             revert ActiveProposalNotExpired();
         }
@@ -292,12 +301,14 @@ contract Governance is Policy {
             activeProposal.instructionsId
         );
 
-        for (uint256 step; step < instructions.length;) {
+        for (uint256 step; step < instructions.length; ) {
             kernel.executeAction(
                 instructions[step].action,
                 instructions[step].target
             );
-            unchecked { ++step; }
+            unchecked {
+                ++step;
+            }
         }
 
         // emit the corresponding event
@@ -312,7 +323,9 @@ contract Governance is Policy {
         uint256 userVotes = userVotesForProposal[instructionsId_][msg.sender];
 
         // ensure the user is not claiming empty votes
-        if (userVotes == 0) { revert CannotReclaimZeroVotes(); }
+        if (userVotes == 0) {
+            revert CannotReclaimZeroVotes();
+        }
 
         // ensure the user is not claiming for the active propsal
         if (instructionsId_ == activeProposal.instructionsId) {

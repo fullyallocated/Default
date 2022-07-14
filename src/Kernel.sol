@@ -72,6 +72,9 @@ abstract contract Module {
 
 abstract contract Policy {
     Kernel public kernel;
+    
+    mapping(Kernel.Keycode => bool) public hasDependency;
+
 
     constructor(Kernel kernel_) {
         kernel = kernel_;
@@ -82,7 +85,23 @@ abstract contract Policy {
         _;
     }
 
-    function configureReads() external virtual onlyKernel {}
+    function _toKeycode(bytes5 keycode_) internal pure returns (Kernel.Keycode keycode) {
+        keycode = Kernel.Keycode.wrap(keycode_);
+    }
+
+    function registerDependency(Kernel.Keycode keycode_) 
+      external 
+      onlyKernel  
+    {
+        hasDependency[keycode_] = true;
+    }
+
+    function updateDependencies() 
+      external 
+      virtual 
+      onlyKernel 
+      returns (Kernel.Keycode[] memory dependencies) 
+    {}
 
     function requestPermissions()
         external
@@ -112,6 +131,7 @@ contract Kernel {
     mapping(Keycode => address) public getModuleForKeycode; // get contract for module keycode
     mapping(address => Keycode) public getKeycodeForModule; // get module keycode for contract
     mapping(address => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
+    
     address[] public allPolicies;
 
 
@@ -184,46 +204,56 @@ contract Kernel {
         getKeycodeForModule[newModule_] = keycode;
         getModuleForKeycode[keycode] = newModule_;
 
-        _reconfigurePolicies();
+        // go through each policy in the Kernel and update its dependencies if they include the module
+        for (uint i; i < allPolicies.length; ) {
+            address policy = allPolicies[i];
+            if (Policy(policy).hasDependency(keycode)) {
+                Policy(policy).updateDependencies();
+            }
+        }
     }
 
     function _approvePolicy(address policy_) internal {
-        Policy(policy_).configureReads();
-
+        Policy(policy_).updateDependencies();
         RequestPermissions[] memory requests = Policy(policy_).requestPermissions();
-        _setPolicyPermissions(policy_, requests, true);
+        
+        for (uint256 i = 0; i < requests.length; ) {
+            RequestPermissions memory request = requests[i];
+
+            policyPermissions[policy_][request.keycode][request.funcSelector] = true;
+
+            Policy(policy_).registerDependency(request.keycode);
+
+            emit PermissionsUpated(policy_, request.keycode, request.funcSelector, true);
+
+            unchecked { i++; }
+
+        }
 
         allPolicies.push(policy_);
     }
 
     function _terminatePolicy(address policy_) internal {
+
         RequestPermissions[] memory requests = Policy(policy_).requestPermissions();
-        _setPolicyPermissions(policy_, requests, false);
-    }
 
-    function _reconfigurePolicies() internal {
-        for (uint256 i = 0; i < allPolicies.length; i++) {
-            address policy_ = allPolicies[i];
+        for (uint256 i = 0; i < requests.length; ) {
+            RequestPermissions memory request = requests[i];
 
-            // if (approvedPolicies[policy_] == true)
-            //     Policy(policy_).configureReads();
+            policyPermissions[policy_][request.keycode][request.funcSelector] = false;
+
+            emit PermissionsUpated(policy_, request.keycode, request.funcSelector, false);
+
+            unchecked { i++; }
         }
-    }
 
-    function _setPolicyPermissions(
-        address policy_,
-        RequestPermissions[] memory requests_,
-        bool grant_
-    ) internal {
-        for (uint256 i = 0; i < requests_.length; ) {
-            RequestPermissions memory request = requests_[i];
+        // swap the current policy (terminated) with the last policy in the list and remove the last item
+        uint numPolicies = allPolicies.length;
 
-            policyPermissions[policy_][request.keycode][request.funcSelector] = grant_;
-
-            emit PermissionsUpated(policy_, request.keycode, request.funcSelector, grant_);
-
-            unchecked {
-                i++;
+        for (uint j; j < numPolicies;) {
+            if (allPolicies[j] == policy_) {
+              allPolicies[j] = allPolicies[numPolicies - 1]; 
+              allPolicies.pop();
             }
         }
     }

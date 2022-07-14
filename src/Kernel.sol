@@ -51,7 +51,7 @@ abstract contract Module {
 
     modifier permissioned(bytes4 funcSelector_) {
       Kernel.Keycode keycode = KEYCODE();
-      if (kernel.policyPermissions(msg.sender, keycode, funcSelector_) == false) {
+      if (kernel.policyPermissions(Policy(msg.sender), keycode, funcSelector_) == false) {
         revert Module_PolicyNotAuthorized();
       }
       _;
@@ -111,12 +111,12 @@ abstract contract Policy {
     {}
 
     function getModuleAddress(Kernel.Keycode keycode_) internal view returns (address) {
-        address moduleForKeycode = kernel.getModuleForKeycode(keycode_);
+        address moduleAddress = address(kernel.getModuleForKeycode(keycode_));
 
-        if (moduleForKeycode == address(0))
+        if (moduleAddress == address(0))
             revert Policy_ModuleDoesNotExist(keycode_);
 
-        return moduleForKeycode;
+        return moduleAddress;
     }
 }
 
@@ -128,20 +128,19 @@ contract Kernel {
 
     // ######################## ~ DEPENDENCY MANAGEMENT ~ ########################
 
-    mapping(Keycode => address) public getModuleForKeycode; // get contract for module keycode
-    mapping(address => Keycode) public getKeycodeForModule; // get module keycode for contract
-    mapping(address => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
-    
-    address[] public allPolicies;
+    mapping(Keycode => Module) public getModuleForKeycode; // get contract for module keycode
+    mapping(Module => Keycode) public getKeycodeForModule; // get module keycode for contract
+    mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function
+    Policy[] public allPolicies; // all the approved policies in the kernel
 
 
     // ######################## ~ EVENTS ~ ########################
 
     event PermissionsUpated(
-        address indexed policy_,
+        Policy indexed policy_,
         Keycode indexed keycode_,
-        bytes4 funcSelector_,
-        bool indexed granted_
+        bytes4 indexed funcSelector_,
+        bool granted_
     );
 
     event ActionExecuted(Actions indexed action_, address indexed target_);
@@ -166,13 +165,13 @@ contract Kernel {
         onlyExecutor
     {
         if (action_ == Actions.InstallModule) {
-            _installModule(target_);
+            _installModule(Module(target_));
         } else if (action_ == Actions.UpgradeModule) {
-            _upgradeModule(target_);
+            _upgradeModule(Module(target_));
         } else if (action_ == Actions.ApprovePolicy) {
-            _approvePolicy(target_);
+            _approvePolicy(Policy(target_));
         } else if (action_ == Actions.TerminatePolicy) {
-            _terminatePolicy(target_);
+            _terminatePolicy(Policy(target_));
         } else if (action_ == Actions.ChangeExecutor) {
             executor = target_;
         }
@@ -182,22 +181,22 @@ contract Kernel {
 
     // ######################## ~ KERNEL INTERNAL ~ ########################
 
-    function _installModule(address newModule_) internal {
+    function _installModule(Module newModule_) internal {
         Keycode keycode = Module(newModule_).KEYCODE();
 
         // @NOTE check newModule_ != 0
-        if (getModuleForKeycode[keycode] != address(0))
+        if (address(getModuleForKeycode[keycode]) != address(0))
             revert Kernel_ModuleAlreadyInstalled(keycode);
 
         getModuleForKeycode[keycode] = newModule_;
         getKeycodeForModule[newModule_] = keycode;
     }
 
-    function _upgradeModule(address newModule_) internal {
-        Keycode keycode = Module(newModule_).KEYCODE();
-        address oldModule = getModuleForKeycode[keycode];
+    function _upgradeModule(Module newModule_) internal {
+        Keycode keycode = newModule_.KEYCODE();
+        Module oldModule = getModuleForKeycode[keycode];
 
-        if (oldModule == address(0) || oldModule == newModule_)
+        if (address(oldModule) == address(0) || address(oldModule) == address(newModule_))
             revert Kernel_ModuleAlreadyExists(keycode);
 
         getKeycodeForModule[oldModule] = Keycode.wrap(bytes5(0));
@@ -206,23 +205,23 @@ contract Kernel {
 
         // go through each policy in the Kernel and update its dependencies if they include the module
         for (uint i; i < allPolicies.length; ) {
-            address policy = allPolicies[i];
-            if (Policy(policy).hasDependency(keycode)) {
-                Policy(policy).updateDependencies();
+            Policy policy = allPolicies[i];
+            if (policy.hasDependency(keycode)) {
+                policy.updateDependencies();
             }
         }
     }
 
-    function _approvePolicy(address policy_) internal {
-        Policy(policy_).updateDependencies();
-        RequestPermissions[] memory requests = Policy(policy_).requestPermissions();
+    function _approvePolicy(Policy policy_) internal {
+        policy_.updateDependencies();
+        RequestPermissions[] memory requests = policy_.requestPermissions();
         
         for (uint256 i = 0; i < requests.length; ) {
             RequestPermissions memory request = requests[i];
 
             policyPermissions[policy_][request.keycode][request.funcSelector] = true;
 
-            Policy(policy_).registerDependency(request.keycode);
+            policy_.registerDependency(request.keycode);
 
             emit PermissionsUpated(policy_, request.keycode, request.funcSelector, true);
 
@@ -233,7 +232,7 @@ contract Kernel {
         allPolicies.push(policy_);
     }
 
-    function _terminatePolicy(address policy_) internal {
+    function _terminatePolicy(Policy policy_) internal {
 
         RequestPermissions[] memory requests = Policy(policy_).requestPermissions();
 

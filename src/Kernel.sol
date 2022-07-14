@@ -11,10 +11,14 @@ error Module_PolicyNotAuthorized();
 
 error Policy_ModuleDoesNotExist(Kernel.Keycode keycode_);
 error Policy_OnlyKernel(address caller_);
+error Policy_OnlyIdentity(Kernel.Identity identity_);
 
 // KERNEL
 
 error Kernel_OnlyExecutor(address caller_);
+error Kernel_OnlyAdmin(address caller_);
+error Kernel_IdentityAlreadyExists(Kernel.Identity identity_);
+error Kernel_InvalidIdentity(Kernel.Identity identity_);
 error Kernel_ModuleAlreadyInstalled(Kernel.Keycode module_);
 error Kernel_ModuleAlreadyExists(Kernel.Keycode module_);
 error Kernel_PolicyAlreadyApproved(address policy_);
@@ -27,7 +31,8 @@ enum Actions {
     UpgradeModule,
     ApprovePolicy,
     TerminatePolicy,
-    ChangeExecutor
+    ChangeExecutor,
+    ChangeAdmin
 }
 
 struct Instruction {
@@ -85,6 +90,11 @@ abstract contract Policy {
         _;
     }
 
+    modifier onlyIdentity(Kernel.Identity identity_) {
+        if(Kernel.Identity.unwrap(kernel.getIdentityOfAddress(msg.sender)) != Kernel.Identity.unwrap(identity_)) revert Policy_OnlyIdentity(identity_);
+        _;
+    }
+
     function _toKeycode(bytes5 keycode_) internal pure returns (Kernel.Keycode keycode) {
         keycode = Kernel.Keycode.wrap(keycode_);
     }
@@ -124,14 +134,20 @@ contract Kernel {
     // ######################## ~ VARS ~ ########################
 
     type Keycode is bytes5;
+    type Identity is bytes10;
     address public executor;
+    address public admin;
 
     // ######################## ~ DEPENDENCY MANAGEMENT ~ ########################
 
-    mapping(Keycode => Module) public getModuleForKeycode; // get contract for module keycode
-    mapping(Module => Keycode) public getKeycodeForModule; // get module keycode for contract
     mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function
     Policy[] public allPolicies; // all the approved policies in the kernel
+
+    mapping(Keycode => Module) public getModuleForKeycode; // get contract for module keycode
+    mapping(Module => Keycode) public getKeycodeForModule; // get module keycode for contract
+    
+    mapping(address => Identity) public getIdentityOfAddress;
+    mapping(Identity => address) public getAddressOfIdentity;
 
 
     // ######################## ~ EVENTS ~ ########################
@@ -158,7 +174,38 @@ contract Kernel {
         _;
     }
 
+    modifier onlyAdmin() {
+        if (msg.sender != admin) revert Kernel_OnlyAdmin(msg.sender);
+        _;
+    }
+
     // ######################## ~ KERNEL INTERFACE ~ ########################
+
+
+    function registerIdentity(address address_, Identity identity_)
+      external
+      onlyAdmin
+    {
+      if (Identity.unwrap(getIdentityOfAddress[address_]) != bytes10(0) ) revert Kernel_IdentityAlreadyExists(identity_);
+      for (uint256 i; i < 10;) {
+        bytes1 char = Identity.unwrap(identity_)[i];
+        if (!(char >= 0x61 && char <= 0x7A)) revert Kernel_InvalidIdentity(identity_);  // a-z only
+      }
+      getIdentityOfAddress[address_] = identity_;
+      getAddressOfIdentity[identity_] = address_;
+    }
+
+
+    function revokeIdentity(Identity identity_)
+      external
+      onlyAdmin
+    {
+      address addressOfIdentity = getAddressOfIdentity[identity_];
+      if (addressOfIdentity == address(0)) revert Kernel_IdentityAlreadyExists(identity_);
+      getAddressOfIdentity[identity_] = address(0);
+      getIdentityOfAddress[addressOfIdentity] = Identity.wrap(bytes10(0));
+    }
+
 
     function executeAction(Actions action_, address target_)
         external
@@ -174,6 +221,8 @@ contract Kernel {
             _terminatePolicy(Policy(target_));
         } else if (action_ == Actions.ChangeExecutor) {
             executor = target_;
+        } else if (action_ == Actions.ChangeAdmin) {
+            admin = target_;
         }
 
         emit ActionExecuted(action_, target_);

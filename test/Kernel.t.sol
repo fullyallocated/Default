@@ -28,6 +28,7 @@ contract KernelTest is Test {
     function testCorrectness_IntializeKernel() public {
       assertEq(kernel.executor(), deployer);
       assertEq(kernel.admin(), deployer);
+      assertEq(kernel.policyPermissions(Policy(address(0)), "XXXXX", bytes4(0)), false);
     }
 
     function testCorrectness_InstallModule() public {

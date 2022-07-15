@@ -165,6 +165,7 @@ contract Kernel {
 
     constructor() {
         executor = msg.sender;
+        admin = msg.sender;
     }
 
     // ######################## ~ MODIFIERS ~ ########################

@@ -216,6 +216,22 @@ contract Kernel {
         }
     }
 
+    function toKeycode(bytes5 keycode_) public pure returns (Kernel.Keycode keycode) {
+        keycode = Kernel.Keycode.wrap(keycode_);
+    }
+
+    function fromKeycode(Keycode keycode_) public pure returns (bytes5 keycode) {
+        keycode = Keycode.unwrap(keycode_);
+    }
+
+    function toIdentity(bytes5 identity_) public pure returns (Identity identity) {
+        identity = Identity.wrap(identity_);
+    }
+
+    function fromidentity(Identity identity_) public pure returns (bytes10 identity) {
+        identity = Identity.unwrap(identity_);
+    }
+
 
     function registerIdentity(address address_, Identity identity_)
       external

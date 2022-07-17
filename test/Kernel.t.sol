@@ -41,6 +41,15 @@ contract KernelTest is Test {
       assertEq(kernel.getAddressOfIdentity(identity), address(0));
     }
 
+    function testCorrectness_IntializeModule() public {
+      assertEq(module.KEYCODE(), Kernel.Keycode.wrap());
+      assertEq(module.admin(), deployer);
+    }
+
+    function testCorrectness_IntializePolicy() public {
+      assertEq(kernel.executor(), deployer);
+      assertEq(kernel.admin(), deployer);
+    }
     // Initialize Module
         // - check that it has a keycode
         // - check that it has the right internel variables & configurations

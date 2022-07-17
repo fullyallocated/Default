@@ -65,12 +65,12 @@ contract Governance is Policy {
         dependencies = new Kernel.Keycode[](2);
 
         // 1. Instructions Module
-        dependencies[0] = keycode("INSTR");
-        INSTR = DefaultInstructions(getModuleAddress(keycode("INSTR")));
+        dependencies[0] = Kernel.toKeycode("INSTR");
+        INSTR = DefaultInstructions(getModuleAddress(Kernel.toKeycode("INSTR")));
 
         // 2. Votes Module
-        dependencies[1] = keycode("VOTES");
-        VOTES = DefaultVotes(getModuleAddress(keycode("VOTES")));
+        dependencies[1] = Kernel.toKeycode("VOTES");
+        VOTES = DefaultVotes(getModuleAddress(Kernel.toKeycode("VOTES")));
     }
 
     function requestPermissions()
@@ -81,9 +81,9 @@ contract Governance is Policy {
         returns (RequestPermissions[] memory requests)
     {
         requests = new RequestPermissions[](3);
-        requests[0] = RequestPermissions(keycode("INSTR"), INSTR.store.selector);
-        requests[1] = RequestPermissions(keycode("VOTES"), VOTES.mintTo.selector);
-        requests[2] = RequestPermissions(keycode("VOTES"), VOTES.burnFrom.selector);
+        requests[0] = RequestPermissions(Kernel.toKeycode("INSTR"), INSTR.store.selector);
+        requests[1] = RequestPermissions(Kernel.toKeycode("VOTES"), VOTES.mintTo.selector);
+        requests[2] = RequestPermissions(Kernel.toKeycode("VOTES"), VOTES.burnFrom.selector);
     }
 
     /////////////////////////////////////////////////////////////////////////////////

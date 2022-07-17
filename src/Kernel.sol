@@ -19,8 +19,10 @@ error Kernel_OnlyExecutor(address caller_);
 error Kernel_OnlyAdmin(address caller_);
 error Kernel_IdentityAlreadyExists(Kernel.Identity identity_);
 error Kernel_InvalidIdentity(Kernel.Identity identity_);
+error Kernel_InvalidTargetNotAContract(address target_);
 error Kernel_ModuleAlreadyInstalled(Kernel.Keycode module_);
 error Kernel_ModuleAlreadyExists(Kernel.Keycode module_);
+error Kernel_InvalidModuleKeycode(Kernel.Keycode module_);
 error Kernel_PolicyAlreadyApproved(address policy_);
 error Kernel_PolicyNotApproved(address policy_);
 
@@ -54,9 +56,9 @@ abstract contract Module {
         kernel = kernel_;
     }
 
-    modifier permissioned(bytes4 funcSelector_) {
+    modifier permissioned() {
       Kernel.Keycode keycode = KEYCODE();
-      if (kernel.policyPermissions(Policy(msg.sender), keycode, funcSelector_) == false) {
+      if (kernel.policyPermissions(Policy(msg.sender), keycode, msg.sig) == false) {
         revert Module_PolicyNotAuthorized();
       }
       _;
@@ -95,7 +97,7 @@ abstract contract Policy {
         _;
     }
 
-    function _toKeycode(bytes5 keycode_) internal pure returns (Kernel.Keycode keycode) {
+    function keycode(bytes5 keycode_) internal pure returns (Kernel.Keycode keycode) {
         keycode = Kernel.Keycode.wrap(keycode_);
     }
 
@@ -182,16 +184,46 @@ contract Kernel {
 
     // ######################## ~ KERNEL INTERFACE ~ ########################
 
+    function ensureContract(address target_) public view {
+        uint256 size;
+        assembly {
+            size := extcodesize(target_)
+        }
+        if (size == 0) revert Kernel_InvalidTargetNotAContract(target_);
+    }
+
+    function ensureValidKeycode(Kernel.Keycode keycode_) public pure {
+        bytes5 unwrapped = Kernel.Keycode.unwrap(keycode_);
+
+        for (uint256 i = 0; i < 5; ) {
+            bytes1 char = unwrapped[i];
+
+            if (char < 0x41 || char > 0x5A) revert Kernel_InvalidModuleKeycode(keycode_); // A-Z only"
+
+            unchecked { i++; }
+        }
+    }
+
+    function ensureValidIdentity(Kernel.Identity identity_) public pure {
+        bytes10 unwrapped = Kernel.Identity.unwrap(identity_);
+
+        for (uint256 i = 0; i < 10; ) {
+            bytes1 char = unwrapped[i];
+            if (!(char >= 0x61 && char <= 0x7A)) {
+              revert Kernel_InvalidIdentity(identity_);  // a-z only
+            }
+            unchecked { i++; }
+        }
+    }
+
 
     function registerIdentity(address address_, Identity identity_)
       external
       onlyAdmin
     {
       if (Identity.unwrap(getIdentityOfAddress[address_]) != bytes10(0) ) revert Kernel_IdentityAlreadyExists(identity_);
-      for (uint256 i; i < 10;) {
-        bytes1 char = Identity.unwrap(identity_)[i];
-        if (!(char >= 0x61 && char <= 0x7A)) revert Kernel_InvalidIdentity(identity_);  // a-z only
-      }
+      ensureValidIdentity(identity_);
+
       getIdentityOfAddress[address_] = identity_;
       getAddressOfIdentity[identity_] = address_;
     }
@@ -213,12 +245,18 @@ contract Kernel {
         onlyExecutor
     {
         if (action_ == Actions.InstallModule) {
+            ensureContract(target_);
+            ensureValidKeycode(Module(target_).KEYCODE());
             _installModule(Module(target_));
         } else if (action_ == Actions.UpgradeModule) {
+            ensureContract(target_);
+            ensureValidKeycode(Module(target_).KEYCODE());
             _upgradeModule(Module(target_));
         } else if (action_ == Actions.ApprovePolicy) {
+            ensureContract(target_);
             _approvePolicy(Policy(target_));
         } else if (action_ == Actions.TerminatePolicy) {
+            ensureContract(target_);
             _terminatePolicy(Policy(target_));
         } else if (action_ == Actions.ChangeExecutor) {
             executor = target_;

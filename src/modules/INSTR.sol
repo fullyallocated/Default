@@ -48,7 +48,7 @@ contract DefaultInstructions is Module {
 
     function store(Instruction[] calldata instructions_)
         external
-        permissioned(this.store.selector)
+        permissioned
         returns (uint256)
     {
         uint256 length = instructions_.length;
@@ -68,7 +68,7 @@ contract DefaultInstructions is Module {
             Instruction calldata instruction = instructions_[i];
 
             // check the address that the instruction is being performed on is a contract (bytecode size > 0)
-            _ensureContract(instruction.target);
+            kernel.ensureContract(instruction.target);
 
             // if the instruction deals with a module, make sure the module has a valid keycode (UPPERCASE A-Z ONLY)
             if (
@@ -76,7 +76,7 @@ contract DefaultInstructions is Module {
                 instruction.action == Actions.UpgradeModule
             ) {
                 Module module = Module(instruction.target);
-                _ensureValidKeycode(module.KEYCODE());
+                kernel.ensureValidKeycode(module.KEYCODE());
             } else if (
                 instruction.action == Actions.ChangeExecutor && i != length - 1
             ) {
@@ -96,27 +96,5 @@ contract DefaultInstructions is Module {
         emit InstructionsStored(instructionsId);
 
         return instructionsId;
-    }
-
-    /////////////////////////////// INTERNAL FUNCTIONS ////////////////////////////////
-
-    function _ensureContract(address target_) internal view {
-        uint256 size;
-        assembly {
-            size := extcodesize(target_)
-        }
-        if (size == 0) revert INSTR_InvalidTargetNotAContract();
-    }
-
-    function _ensureValidKeycode(Kernel.Keycode keycode_) internal pure {
-        bytes5 unwrapped = Kernel.Keycode.unwrap(keycode_);
-
-        for (uint256 i = 0; i < 5; ) {
-            bytes1 char = unwrapped[i];
-
-            if (char < 0x41 || char > 0x5A) revert INSTR_InvalidModuleKeycode(); // A-Z only"
-
-            unchecked { i++; }
-        }
     }
 }

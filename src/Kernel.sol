@@ -47,23 +47,6 @@ struct Permissions {
 
 // ######################## ~ MODULE ABSTRACT ~ ########################
 
-abstract contract Auth {
-    Kernel kernel;
-
-    constructor(Kernel kernel_) {
-        kernel = kernel_;
-    }
-
-    modifier requiresAuth() virtual {
-        if (!isAuthorized(msg.sender, msg.sig)) revert Auth_Unauthorized();
-        _;
-    }
-
-    function isAuthorized(address user, bytes4 functionSig) internal view virtual returns (bool) {
-        return false; //(kernel.canCall(user, address(this), functionSig));
-    }
-}
-
 abstract contract Module {
     event PermissionSet(bytes4 funcSelector_, address policy_, bool permission_);
 
@@ -156,11 +139,11 @@ contract Kernel {
     // Policies are limited to max of 256 due to permissions mapping limitations
     uint256 constant MAX_POLICIES = 256;
     address[] public allPolicies; // Length of this array is number of approved policies
-    mapping(address => uint256) public policyIndex; // Reverse lookup for policy index
+    mapping(address => uint256) public getPolicyIndex; // Reverse lookup for policy index
 
-    // TODO
     // Policy <> Module Permissions
     mapping(address => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
+    //mapping(Keycode => mapping(bytes4 => bytes32)) public policyPermissions;
 
     // ######################## ~ EVENTS ~ ########################
 
@@ -246,7 +229,7 @@ contract Kernel {
         else {
             allPolicies.push(policy_);
             // Can use numPolicies since it is now incremented.
-            policyIndex[policy_] = numPolicies;
+            getPolicyIndex[policy_] = numPolicies;
         }
 
         // Record module dependencies
@@ -264,22 +247,24 @@ contract Kernel {
         _setPolicyPermissions(policy_, requests, false);
 
         // Decrement policy count by swapping with last policy and popping array
-        uint256 idx = policyIndex[policy_];
+        uint256 idx = getPolicyIndex[policy_];
         address lastPolicy = allPolicies[allPolicies.length - 1];
 
         allPolicies[idx] = lastPolicy;
-        policyIndex[lastPolicy] = idx;
+        getPolicyIndex[lastPolicy] = idx;
         allPolicies.pop();
     }
 
     function _reconfigurePolicies(Keycode keycode_) internal {
-        // TODO check keycode for its dependents and reconfigure
         address[] memory dependents = moduleDependents[keycode_];
         uint256 depLength = dependents.length;
 
         for (uint256 i; i < depLength; ) {
             Policy(dependents[i]).configureDependencies();
-            unchecked { ++i; }
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
@@ -288,7 +273,8 @@ contract Kernel {
         Permissions[] memory requests_,
         bool grant_
     ) internal {
-        for (uint256 i = 0; i < requests_.length; ) {
+        uint256 reqLength = requests_.length;
+        for (uint256 i = 0; i < reqLength; ) {
             Permissions memory request = requests_[i];
 
             policyPermissions[policy_][request.keycode][request.funcSelector] = grant_;

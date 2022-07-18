@@ -13,7 +13,6 @@ contract MockPolicy is Policy {
     function configureDependencies()
         external
         override
-        onlyKernel
         returns (Kernel.Keycode[] memory dependencies)
     {
         MOCKY = MockModule(getModuleAddress(_toKeycode("MOCKY")));
@@ -26,7 +25,6 @@ contract MockPolicy is Policy {
         external
         view
         override
-        onlyKernel
         returns (Permissions[] memory requests)
     {
         requests = new Permissions[](1);

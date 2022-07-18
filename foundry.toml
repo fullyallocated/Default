@@ -5,4 +5,5 @@ remappings = [
     'solmate/=lib/solmate/src/',
     'forge-std/=lib/forge-std/src/',
     'test-utils/=lib/test-utils/src/',
+    'prb-test/=lib/prb-test/src/'
 ]

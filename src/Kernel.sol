@@ -57,7 +57,7 @@ abstract contract Module {
     }
 
     modifier permissioned() {
-        if (kernel.policyPermissions(msg.sender, KEYCODE(), msg.sig) == false)
+        if (!kernel.policyPermissions(msg.sender, KEYCODE(), msg.sig))
           revert Module_PolicyNotAuthorized();
         _;
     }

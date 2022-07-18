@@ -1,25 +1,49 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.13;
 
-import {Test} from "forge-std/Test.sol";
+//import {Test} from "forge-std/Test.sol";
+import { PRBTest } from "prb-test/PRBTest.sol";
 
 import "src/Kernel.sol";
-import {MockModule} from "./mocks/MockModule.sol";
-import {MockPolicy} from "./mocks/MockPolicy.sol";
+import {MockModule, MockPolicy} from "./mocks/MockPolicyModule.sol";
+//import {MockModule} from "./mocks/MockModule.sol";
+//import {MockPolicy} from "./mocks/MockPolicy.sol";
 
-contract KernelTest is Test {
+contract KernelTest is PRBTest {
     Kernel internal kernel;
-    LarpPolicy internal larpPolicy;
-    LarpModule internal LARPR;
+    MockPolicy internal mockPolicy;
+    MockModule internal MOCKY;
+
+    MockPolicy internal policyTest;
 
     function setUp() public {
         kernel = new Kernel();
         //userCreater = new users(1);
 
-        larpPolicy = new LarpPolicy(kernel);
-        LARPR = new LarpModule(kernel);
+        mockPolicy = new MockPolicy(kernel);
+        MOCKY = new MockModule(kernel);
+
+        kernel.executeAction(Actions.InstallModule, address(MOCKY));
+        kernel.executeAction(Actions.ApprovePolicy, address(mockPolicy));
+
+        // For approve policy test
+        policyTest = new MockPolicy(kernel);
     }
 
+    function testGas_ApprovePolicy() public {
+        //MockPolicy policyTest = new MockPolicy(kernel);
+        kernel.executeAction(Actions.ApprovePolicy, address(policyTest));
+    }
+
+    function testGas_CallPublic() public {
+        mockPolicy.callPublicFunction();
+    }
+
+    function testGas_CallPermissioned() public {
+        mockPolicy.callPermissionedFunction();
+    }
+
+    /*
     function test_InstallModule() public {
         address moduleAddr = address(LARPR);
 
@@ -51,7 +75,7 @@ contract KernelTest is Test {
     }
 
     function test_ApprovePolicy() public {
-        address policyAddr = address(larpPolicy);
+        address policyAddr = address(mockPolicy);
         kernel.executeAction(Actions.ApprovePolicy, policyAddr);
 
         // TODO test policy is added to end of allPolicies
@@ -61,7 +85,7 @@ contract KernelTest is Test {
     }
 
     function test_TerminatePolicy() public {
-        address policyAddr = address(larpPolicy);
+        address policyAddr = address(mockPolicy);
         kernel.executeAction(Actions.ApprovePolicy, policyAddr); // Tested above
 
         kernel.executeAction(Actions.TerminatePolicy, policyAddr);
@@ -70,4 +94,5 @@ contract KernelTest is Test {
         assertFalse(kernel.approvedPolicies(policyAddr));
         assertFalse(kernel.getWritePermissions("LARPR", policyAddr));
     }
+    */
 }

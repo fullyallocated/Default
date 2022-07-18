@@ -4,30 +4,25 @@ pragma solidity ^0.8.13;
 import {Kernel, Policy, Module, Permissions} from "src/Kernel.sol";
 
 contract MockPolicy is Policy {
-
     MockModule public MOCKY;
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
-    function setDependencies()
+    function configureDependencies()
         external
         override
-        onlyKernel
         returns (Kernel.Keycode[] memory dependencies)
     {
-        // declare the number of dependencies
-        dependencies = new Kernel.Keycode[](1);
-
-        // 1. Instructions Module
-        dependencies[0] = _toKeycode("MOCKY");
         MOCKY = MockModule(getModuleAddress(_toKeycode("MOCKY")));
+
+        dependencies = new Kernel.Keycode[](1);
+        dependencies[0] = _toKeycode("MOCKY");
     }
 
-    function permissions()
+    function requestPermissions()
         external
         view
         override
-        onlyKernel
         returns (Permissions[] memory requests)
     {
         requests = new Permissions[](1);
@@ -42,7 +37,6 @@ contract MockPolicy is Policy {
     function callPermissionedFunction() external {
       MOCKY.permissionedCall();
     }
-
 }
 
 contract MockModule is Module {
@@ -63,23 +57,4 @@ contract MockModule is Module {
     permissionedState++;
   }
 
-}
-
-contract InvalidMockModule is Module {
-  constructor(Kernel kernel_) Module(kernel_) {}
-
-  uint256 public publicState; 
-  uint256 public permissionedState;
-
-  function KEYCODE() public pure override returns (Kernel.Keycode) {
-      return Kernel.Keycode.wrap("badkc");
-  }
-
-  function publicCall() public {
-    publicState++;
-  }
-
-  function permissionedCall() public permissioned {
-    permissionedState++;
-  }
 }

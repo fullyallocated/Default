@@ -24,14 +24,14 @@ contract DefaultVotes is Module, ERC20 {
 
     function mintTo(address wallet_, uint256 amount_)
         external
-        permissioned(this.mintTo.selector)
+        permissioned
     {
         _mint(wallet_, amount_);
     }
 
     function burnFrom(address wallet_, uint256 amount_)
         external
-        permissioned(this.burnFrom.selector)
+        permissioned
     {
         _burn(wallet_, amount_);
     }
@@ -48,7 +48,7 @@ contract DefaultVotes is Module, ERC20 {
     function transferFrom(address from_, address to_, uint256 amount_) 
       public 
       override 
-      permissioned(this.transferFrom.selector)
+      permissioned
       returns (bool) 
     {
       // skip the approve function because callers must be pre-approved via governance

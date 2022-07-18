@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.13;
 
-import {Kernel, RequestPermissions, Policy} from "../Kernel.sol";
+import {Kernel, Policy, Permissions} from "../Kernel.sol";
 import {DefaultInstructions, Actions, Instruction} from "../modules/INSTR.sol";
 import {DefaultVotes} from "../modules/VOTES.sol";
 
@@ -70,12 +70,12 @@ contract Governance is Policy {
         view
         override
         onlyKernel
-        returns (RequestPermissions[] memory requests)
+        returns (Permissions[] memory requests)
     {
-        requests = new RequestPermissions[](3);
-        requests[0] = RequestPermissions(Kernel.Keycode.wrap("INSTR"), INSTR.store.selector);
-        requests[1] = RequestPermissions(Kernel.Keycode.wrap("VOTES"), VOTES.mintTo.selector);
-        requests[2] = RequestPermissions(Kernel.Keycode.wrap("VOTES"), VOTES.burnFrom.selector);
+        requests = new Permissions[](3);
+        requests[0] = Permissions(Kernel.Keycode.wrap("INSTR"), INSTR.store.selector);
+        requests[1] = Permissions(Kernel.Keycode.wrap("VOTES"), VOTES.mintTo.selector);
+        requests[2] = Permissions(Kernel.Keycode.wrap("VOTES"), VOTES.burnFrom.selector);
     }
 
 

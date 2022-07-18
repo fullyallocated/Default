@@ -48,7 +48,7 @@ contract DefaultInstructions is Module {
 
     function store(Instruction[] calldata instructions_)
         external
-        permissioned(this.store.selector)
+        permissioned
         returns (uint256)
     {
         uint256 length = instructions_.length;

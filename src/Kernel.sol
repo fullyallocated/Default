@@ -109,14 +109,17 @@ abstract contract Policy {
         _;
     }
 
-    function configureReads() external virtual onlyKernel {}
+    //function configureReads() external virtual onlyKernel {}
+    function configureDependencies() 
+        external
+        virtual
+        returns (Kernel.Keycode[] memory dependencies) {}
 
     function requestPermissions()
         external
         view
         virtual
-        returns (Permissions[] memory requests)
-    {}
+        returns (Permissions[] memory requests) {}
 
     function getModuleAddress(Kernel.Keycode keycode_) internal view returns (address) {
         address moduleForKeycode = kernel.getModuleForKeycode(keycode_);
@@ -125,6 +128,14 @@ abstract contract Policy {
             revert Policy_ModuleDoesNotExist(keycode_);
 
         return moduleForKeycode;
+    }
+
+    function _toKeycode(bytes5 keycode_) internal pure returns (Kernel.Keycode) {
+        return Kernel.Keycode.wrap(keycode_);
+    }
+
+    function _fromKeycode(Kernel.Keycode keycode_) internal pure returns (bytes5) {
+        return Kernel.Keycode.unwrap(keycode_);
     }
 }
 
@@ -140,12 +151,14 @@ contract Kernel {
     // Module Management
     mapping(Keycode => address) public getModuleForKeycode; // get contract for module keycode
     mapping(address => Keycode) public getKeycodeForModule; // get module keycode for contract
+    mapping(Keycode => address[]) public moduleDependents;
 
-    // Policies are limited to max of 256 due to permissions mapping limitations.
+    // Policies are limited to max of 256 due to permissions mapping limitations
     uint256 constant MAX_POLICIES = 256;
     address[] public allPolicies; // Length of this array is number of approved policies
     mapping(address => uint256) public policyIndex; // Reverse lookup for policy index
 
+    // TODO
     // Policy <> Module Permissions
     mapping(address => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
 
@@ -217,15 +230,15 @@ contract Kernel {
         getKeycodeForModule[newModule_] = keycode;
         getModuleForKeycode[keycode] = newModule_;
 
-        _reconfigurePolicies();
+        _reconfigurePolicies(keycode);
     }
 
     function _approvePolicy(address policy_) internal {
-        Policy(policy_).configureReads();
-
+        // Grant permissions for policy to access restricted module functions
         Permissions[] memory requests = Policy(policy_).requestPermissions();
         _setPolicyPermissions(policy_, requests, true);
 
+        // Add policy to list of active policies
         uint256 numPolicies = allPolicies.length;
 
         if (numPolicies == MAX_POLICIES)
@@ -236,7 +249,14 @@ contract Kernel {
             policyIndex[policy_] = numPolicies;
         }
 
-        //allPolicies.push(policy_);
+        // Record module dependencies
+        Keycode[] memory dependencies = Policy(policy_).configureDependencies();
+        uint256 depLength = dependencies.length;
+
+        for (uint256 i; i < depLength;) {
+            moduleDependents[dependencies[i]].push(policy_);
+            unchecked { ++i; }
+        }
     }
 
     function _terminatePolicy(address policy_) internal {
@@ -252,12 +272,14 @@ contract Kernel {
         allPolicies.pop();
     }
 
-    function _reconfigurePolicies() internal {
-        for (uint256 i = 0; i < allPolicies.length; i++) {
-            address policy_ = allPolicies[i];
+    function _reconfigurePolicies(Keycode keycode_) internal {
+        // TODO check keycode for its dependents and reconfigure
+        address[] memory dependents = moduleDependents[keycode_];
+        uint256 depLength = dependents.length;
 
-            // if (approvedPolicies[policy_] == true)
-            //     Policy(policy_).configureReads();
+        for (uint256 i; i < depLength; ) {
+            Policy(dependents[i]).configureDependencies();
+            unchecked { ++i; }
         }
     }
 

@@ -20,8 +20,10 @@ contract DefaultInstructions is Module {
     constructor(Kernel kernel_) Module(kernel_) {}
 
     function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.toKeycode("INSTR");
+        return _toKeycode("INSTR");
     }
+
+    function INIT() public override onlyKernel {}
 
 
     /////////////////////////////////////////////////////////////////////////////////

@@ -56,7 +56,7 @@ contract Governance is Policy {
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
-    function updateDependencies()
+    function setDependencies()
         external
         override
         returns (Kernel.Keycode[] memory dependencies)
@@ -65,15 +65,15 @@ contract Governance is Policy {
         dependencies = new Kernel.Keycode[](2);
 
         // 1. Instructions Module
-        dependencies[0] = Kernel.toKeycode("INSTR");
-        INSTR = DefaultInstructions(getModuleAddress(Kernel.toKeycode("INSTR")));
+        dependencies[0] = _toKeycode("INSTR");
+        INSTR = DefaultInstructions(getModuleAddress(_toKeycode("INSTR")));
 
         // 2. Votes Module
-        dependencies[1] = Kernel.toKeycode("VOTES");
-        VOTES = DefaultVotes(getModuleAddress(Kernel.toKeycode("VOTES")));
+        dependencies[1] = _toKeycode("VOTES");
+        VOTES = DefaultVotes(getModuleAddress(_toKeycode("VOTES")));
     }
 
-    function requestPermissions()
+    function permissions()
         external
         view
         override
@@ -81,9 +81,9 @@ contract Governance is Policy {
         returns (RequestPermissions[] memory requests)
     {
         requests = new RequestPermissions[](3);
-        requests[0] = RequestPermissions(Kernel.toKeycode("INSTR"), INSTR.store.selector);
-        requests[1] = RequestPermissions(Kernel.toKeycode("VOTES"), VOTES.mintTo.selector);
-        requests[2] = RequestPermissions(Kernel.toKeycode("VOTES"), VOTES.burnFrom.selector);
+        requests[0] = RequestPermissions(_toKeycode("INSTR"), INSTR.store.selector);
+        requests[1] = RequestPermissions(_toKeycode("VOTES"), VOTES.mintTo.selector);
+        requests[2] = RequestPermissions(_toKeycode("VOTES"), VOTES.burnFrom.selector);
     }
 
     /////////////////////////////////////////////////////////////////////////////////

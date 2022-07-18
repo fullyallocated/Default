@@ -5,7 +5,8 @@ pragma solidity ^0.8.13;
 
 // MODULE
 
-error Module_PolicyNotAuthorized();
+error Module_PolicyNotAuthorized(Policy policy_);
+error Module_OnlyKernel(address caller_);
 
 // POLICY
 
@@ -17,14 +18,16 @@ error Policy_OnlyIdentity(Kernel.Identity identity_);
 
 error Kernel_OnlyExecutor(address caller_);
 error Kernel_OnlyAdmin(address caller_);
-error Kernel_IdentityAlreadyExists(Kernel.Identity identity_);
+error Kernel_AddressAlreadyHasIdentity(address address_);
+error Kernel_IdentityDoesNotExistForAddress(address address_);
+error Kernel_IdentityAlreadyExistsForAddress(Kernel.Identity identity_);
 error Kernel_InvalidIdentity(Kernel.Identity identity_);
 error Kernel_InvalidTargetNotAContract(address target_);
-error Kernel_ModuleAlreadyInstalled(Kernel.Keycode module_);
-error Kernel_ModuleAlreadyExists(Kernel.Keycode module_);
+error Kernel_ModuleAlreadyInstalled(Module module_);
+error Kernel_ModuleDoesNotExistForKeycode(Kernel.Keycode keycode_);
 error Kernel_InvalidModuleKeycode(Kernel.Keycode module_);
-error Kernel_PolicyAlreadyApproved(address policy_);
-error Kernel_PolicyNotApproved(address policy_);
+error Kernel_PolicyAlreadyApproved(Policy policy_);
+error Kernel_PolicyNotApproved(Policy policy_);
 
 // ######################## ~ GLOBAL TYPES ~ ########################
 
@@ -59,22 +62,41 @@ abstract contract Module {
     modifier permissioned() {
       Kernel.Keycode keycode = KEYCODE();
       if (kernel.policyPermissions(Policy(msg.sender), keycode, msg.sig) == false) {
-        revert Module_PolicyNotAuthorized();
+        revert Module_PolicyNotAuthorized(Policy(msg.sender));
       }
       _;
     }
 
-    function KEYCODE() public pure virtual returns (Kernel.Keycode);
+    modifier onlyKernel() {
+        if (msg.sender != address(kernel)) revert Module_OnlyKernel(msg.sender);
+        _;
+    }
+
+    function _toKeycode(bytes5 keycode_) internal pure returns (Kernel.Keycode keycode) {
+        keycode = Kernel.Keycode.wrap(keycode_);
+    }
+
+    function _fromKeycode(Kernel.Keycode keycode_) internal pure returns (bytes5 keycode) {
+        keycode = Kernel.Keycode.unwrap(keycode_);
+    }
+
+    function _toIdentity(bytes10 identity_) internal pure returns (Kernel.Identity identity) {
+        identity = Kernel.Identity.wrap(identity_);
+    }
+
+    function _fromidentity(Kernel.Identity identity_) internal pure returns (bytes10 identity) {
+        identity = Kernel.Identity.unwrap(identity_);
+    }
+
+    function KEYCODE() public pure virtual returns (Kernel.Keycode) {}
+
+    
+    function INIT() public virtual onlyKernel {}
 
     /// @notice Specify which version of a module is being implemented.
     /// @dev Minor version change retains interface. Major version upgrade indicates
     ///      breaking change to the interface.
-    function VERSION()
-        external
-        pure
-        virtual
-        returns (uint8 major, uint8 minor)
-    {}
+    function VERSION() external pure virtual returns (uint8 major, uint8 minor) {}
 }
 
 abstract contract Policy {
@@ -97,9 +119,22 @@ abstract contract Policy {
         _;
     }
 
-    function keycode(bytes5 keycode_) internal pure returns (Kernel.Keycode keycode) {
+    function _toKeycode(bytes5 keycode_) internal pure returns (Kernel.Keycode keycode) {
         keycode = Kernel.Keycode.wrap(keycode_);
     }
+
+    function _fromKeycode(Kernel.Keycode keycode_) internal pure returns (bytes5 keycode) {
+        keycode = Kernel.Keycode.unwrap(keycode_);
+    }
+
+    function _toIdentity(bytes10 identity_) internal pure returns (Kernel.Identity identity) {
+        identity = Kernel.Identity.wrap(identity_);
+    }
+
+    function _fromidentity(Kernel.Identity identity_) internal pure returns (bytes10 identity) {
+        identity = Kernel.Identity.unwrap(identity_);
+    }
+
 
     function registerDependency(Kernel.Keycode keycode_) 
       external 
@@ -108,14 +143,14 @@ abstract contract Policy {
         hasDependency[keycode_] = true;
     }
 
-    function updateDependencies() 
+    function setDependencies() 
       external 
       virtual 
       onlyKernel 
       returns (Kernel.Keycode[] memory dependencies) 
     {}
 
-    function requestPermissions()
+    function permissions()
         external
         view
         virtual
@@ -143,6 +178,7 @@ contract Kernel {
     // ######################## ~ DEPENDENCY MANAGEMENT ~ ########################
 
     mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function
+    mapping(Policy => bool) approvedPolicies;
     Policy[] public allPolicies; // all the approved policies in the kernel
 
     mapping(Keycode => Module) public getModuleForKeycode; // get contract for module keycode
@@ -166,19 +202,19 @@ contract Kernel {
     // ######################## ~ BODY ~ ########################
 
     constructor() {
-        executor = msg.sender;
         admin = msg.sender;
+        executor = msg.sender;
     }
 
     // ######################## ~ MODIFIERS ~ ########################
 
-    modifier onlyExecutor() {
-        if (msg.sender != executor) revert Kernel_OnlyExecutor(msg.sender);
+    modifier onlyAdmin() {
+        if (msg.sender != admin) revert Kernel_OnlyAdmin(msg.sender);
         _;
     }
 
-    modifier onlyAdmin() {
-        if (msg.sender != admin) revert Kernel_OnlyAdmin(msg.sender);
+    modifier onlyExecutor() {
+        if(msg.sender != executor) revert Kernel_OnlyExecutor(msg.sender);
         _;
     }
 
@@ -209,35 +245,19 @@ contract Kernel {
 
         for (uint256 i = 0; i < 10; ) {
             bytes1 char = unwrapped[i];
-            if (!(char >= 0x61 && char <= 0x7A)) {
+            if ((char < 0x61 || char > 0x7A) && char != 0x00) {
               revert Kernel_InvalidIdentity(identity_);  // a-z only
             }
             unchecked { i++; }
         }
     }
 
-    function toKeycode(bytes5 keycode_) public pure returns (Kernel.Keycode keycode) {
-        keycode = Kernel.Keycode.wrap(keycode_);
-    }
-
-    function fromKeycode(Keycode keycode_) public pure returns (bytes5 keycode) {
-        keycode = Keycode.unwrap(keycode_);
-    }
-
-    function toIdentity(bytes5 identity_) public pure returns (Identity identity) {
-        identity = Identity.wrap(identity_);
-    }
-
-    function fromidentity(Identity identity_) public pure returns (bytes10 identity) {
-        identity = Identity.unwrap(identity_);
-    }
-
-
     function registerIdentity(address address_, Identity identity_)
-      external
+      public
       onlyAdmin
     {
-      if (Identity.unwrap(getIdentityOfAddress[address_]) != bytes10(0) ) revert Kernel_IdentityAlreadyExists(identity_);
+      if (Identity.unwrap(getIdentityOfAddress[address_]) != bytes10(0) ) revert Kernel_AddressAlreadyHasIdentity(address_);
+      if (getAddressOfIdentity[identity_] != address(0)) revert Kernel_IdentityAlreadyExistsForAddress(identity_);
       ensureValidIdentity(identity_);
 
       getIdentityOfAddress[address_] = identity_;
@@ -245,14 +265,14 @@ contract Kernel {
     }
 
 
-    function revokeIdentity(Identity identity_)
-      external
+    function revokeIdentity(address address_)
+      public
       onlyAdmin
     {
-      address addressOfIdentity = getAddressOfIdentity[identity_];
-      if (addressOfIdentity == address(0)) revert Kernel_IdentityAlreadyExists(identity_);
-      getAddressOfIdentity[identity_] = address(0);
-      getIdentityOfAddress[addressOfIdentity] = Identity.wrap(bytes10(0));
+      Identity identityOfAddress = getIdentityOfAddress[address_];
+      if (getAddressOfIdentity[identityOfAddress] == address(0)) revert Kernel_IdentityDoesNotExistForAddress(address_);
+      getAddressOfIdentity[identityOfAddress] = address(0);
+      getIdentityOfAddress[address_] = Identity.wrap(bytes10(0));
     }
 
 
@@ -290,35 +310,43 @@ contract Kernel {
 
         // @NOTE check newModule_ != 0
         if (address(getModuleForKeycode[keycode]) != address(0))
-            revert Kernel_ModuleAlreadyInstalled(keycode);
-
+            revert Kernel_ModuleAlreadyInstalled(newModule_);
+        
         getModuleForKeycode[keycode] = newModule_;
         getKeycodeForModule[newModule_] = keycode;
+
+        newModule_.INIT();
     }
 
     function _upgradeModule(Module newModule_) internal {
         Keycode keycode = newModule_.KEYCODE();
         Module oldModule = getModuleForKeycode[keycode];
 
-        if (address(oldModule) == address(0) || address(oldModule) == address(newModule_))
-            revert Kernel_ModuleAlreadyExists(keycode);
+        if (address(oldModule) == address(0)) { revert Kernel_ModuleDoesNotExistForKeycode(keycode); }
+        if (address(newModule_) == address(oldModule)) {revert Kernel_ModuleAlreadyInstalled(newModule_);}
 
         getKeycodeForModule[oldModule] = Keycode.wrap(bytes5(0));
         getKeycodeForModule[newModule_] = keycode;
         getModuleForKeycode[keycode] = newModule_;
 
+        newModule_.INIT();
+
         // go through each policy in the Kernel and update its dependencies if they include the module
         for (uint i; i < allPolicies.length; ) {
             Policy policy = allPolicies[i];
             if (policy.hasDependency(keycode)) {
-                policy.updateDependencies();
+                policy.setDependencies();
             }
+
+            unchecked {i++;}
         }
     }
 
     function _approvePolicy(Policy policy_) internal {
-        policy_.updateDependencies();
-        RequestPermissions[] memory requests = policy_.requestPermissions();
+        if (approvedPolicies[policy_]) revert Kernel_PolicyAlreadyApproved(policy_);
+
+        policy_.setDependencies();
+        RequestPermissions[] memory requests = policy_.permissions();
         
         for (uint256 i = 0; i < requests.length; ) {
             RequestPermissions memory request = requests[i];
@@ -332,15 +360,15 @@ contract Kernel {
             unchecked { i++; }
 
         }
-
+        approvedPolicies[policy_] = true;
         allPolicies.push(policy_);
     }
 
-    function _terminatePolicy(Policy policy_) internal {
+    function _terminatePolicy(Policy policy_) internal {        
+        if (!approvedPolicies[policy_]) revert Kernel_PolicyNotApproved(policy_);
+        RequestPermissions[] memory requests = Policy(policy_).permissions();
 
-        RequestPermissions[] memory requests = Policy(policy_).requestPermissions();
-
-        for (uint256 i = 0; i < requests.length; ) {
+        for (uint256 i; i < requests.length; ) {
             RequestPermissions memory request = requests[i];
 
             policyPermissions[policy_][request.keycode][request.funcSelector] = false;
@@ -357,7 +385,10 @@ contract Kernel {
             if (allPolicies[j] == policy_) {
               allPolicies[j] = allPolicies[numPolicies - 1]; 
               allPolicies.pop();
+              break;
             }
         }
+
+        approvedPolicies[policy_] = false;
     }
 }

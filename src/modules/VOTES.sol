@@ -17,8 +17,10 @@ contract DefaultVotes is Module, ERC20 {
     {}
 
     function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.toKeycode("VOTES");
+        return _toKeycode("VOTES");
     }
+
+    function INIT() public override onlyKernel {}
 
     // Policy Interface
 

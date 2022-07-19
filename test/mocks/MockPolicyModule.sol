@@ -50,11 +50,11 @@ contract MockModule is Module {
   }
 
   function publicCall() public {
-    publicState++;
+      publicState++;
   }
 
   function permissionedCall() public permissioned {
-    permissionedState++;
+      permissionedState++;
   }
 
 }

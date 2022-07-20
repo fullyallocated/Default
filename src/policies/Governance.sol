@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.13;
 
-import { Kernel, Policy, Permissions } from "../Kernel.sol";
+import "../Kernel.sol";
 import { DefaultInstructions, Actions, Instruction } from "../modules/INSTR.sol";
 import { DefaultVotes } from "../modules/VOTES.sol";
 
@@ -59,14 +59,14 @@ contract Governance is Policy {
     function configureDependencies()
         external
         override
-        returns (Kernel.Keycode[] memory dependencies)
+        returns (Keycode[] memory dependencies)
     {
-        INSTR = DefaultInstructions(getModuleAddress(_toKeycode("INSTR")));
-        VOTES = DefaultVotes(getModuleAddress(_toKeycode("VOTES")));
+        INSTR = DefaultInstructions(getModuleAddress(toKeycode("INSTR")));
+        VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
 
-        dependencies = new Kernel.Keycode[](2);
-        dependencies[0] = _toKeycode("INSTR");
-        dependencies[1] = _toKeycode("VOTES");
+        dependencies = new Keycode[](2);
+        dependencies[0] = toKeycode("INSTR");
+        dependencies[1] = toKeycode("VOTES");
     }
 
     function requestPermissions()
@@ -77,9 +77,9 @@ contract Governance is Policy {
         returns (Permissions[] memory requests)
     {
         requests = new Permissions[](3);
-        requests[0] = Permissions(_toKeycode("INSTR"), INSTR.store.selector);
-        requests[1] = Permissions(_toKeycode("VOTES"), VOTES.mintTo.selector);
-        requests[2] = Permissions(_toKeycode("VOTES"), VOTES.burnFrom.selector);
+        requests[0] = Permissions(toKeycode("INSTR"), INSTR.store.selector);
+        requests[1] = Permissions(toKeycode("VOTES"), VOTES.mintTo.selector);
+        requests[2] = Permissions(toKeycode("VOTES"), VOTES.burnFrom.selector);
     }
 
     /////////////////////////////////////////////////////////////////////////////////

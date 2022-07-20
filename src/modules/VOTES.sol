@@ -4,16 +4,16 @@
 
 pragma solidity ^0.8.13;
 
-import { Kernel, Module } from "../Kernel.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
+import "src/Kernel.sol";
 
 error VOTES_TransferDisabled();
 
 contract DefaultVotes is Module, ERC20 {
     constructor(Kernel kernel_) Module(kernel_) ERC20("Dummy Voting Tokens", "VOTES", 0) {}
 
-    function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.Keycode.wrap("VOTES");
+    function KEYCODE() public pure override returns (Keycode) {
+        return Keycode.wrap("VOTES");
     }
 
     // Policy Interface

@@ -34,7 +34,7 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_IntializeKernel() public {
-      Kernel.Keycode keycode = Kernel.Keycode.wrap(0);
+      Keycode keycode = Keycode.wrap(0);
       Kernel.Identity identity = Kernel.Identity.wrap(0);
 
       assertEq(kernel.admin(), deployer);
@@ -42,7 +42,7 @@ contract KernelTest is Test {
 
       assertEq(kernel.policyPermissions(policy, keycode, bytes4(0)), false);
       assertEq(address(kernel.getModuleForKeycode(keycode)), address(0));
-      assertEq(Kernel.Keycode.unwrap(kernel.getKeycodeForModule(MOCKY)), bytes5(0));
+      assertEq(Keycode.unwrap(kernel.getKeycodeForModule(MOCKY)), bytes5(0));
 
       err = abi.encodeWithSignature("Kernel_OnlyExecutor(address)", address(this));
       vm.expectRevert(err);
@@ -72,15 +72,15 @@ contract KernelTest is Test {
 
     function testCorrectness_EnsureValidKeycode() public {
 
-      kernel.ensureValidKeycode(Kernel.Keycode.wrap("VALID")); 
+      kernel.ensureValidKeycode(Keycode.wrap("VALID")); 
 
-      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Kernel.Keycode.wrap("inval"));
+      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap("inval"));
       vm.expectRevert(err);
-      kernel.ensureValidKeycode(Kernel.Keycode.wrap("inval"));
+      kernel.ensureValidKeycode(Keycode.wrap("inval"));
 
-      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Kernel.Keycode.wrap(""));
+      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap(""));
       vm.expectRevert(err);
-      kernel.ensureValidKeycode(Kernel.Keycode.wrap(bytes5("")));
+      kernel.ensureValidKeycode(Keycode.wrap(bytes5("")));
     }
 
     function testCorrectness_EnsureValidIdentity() public {
@@ -127,7 +127,7 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_IntializeModule() public {
-      assertEq(Kernel.Keycode.unwrap(MOCKY.KEYCODE()), "MOCKY");
+      assertEq(Keycode.unwrap(MOCKY.KEYCODE()), "MOCKY");
       assertEq(MOCKY.publicState(), 0);
       assertEq(MOCKY.permissionedState(), 0);
     }
@@ -136,15 +136,15 @@ contract KernelTest is Test {
       vm.startPrank(deployer);
 
       kernel.executeAction(Actions.InstallModule, address(MOCKY));
-      assertEq(address(kernel.getModuleForKeycode(Kernel.Keycode.wrap("MOCKY"))), address(MOCKY));
-      assertEq(Kernel.Keycode.unwrap(kernel.getKeycodeForModule(MOCKY)), "MOCKY");
+      assertEq(address(kernel.getModuleForKeycode(Keycode.wrap("MOCKY"))), address(MOCKY));
+      assertEq(Keycode.unwrap(kernel.getKeycodeForModule(MOCKY)), "MOCKY");
 
       err = abi.encodeWithSignature("Kernel_InvalidTargetNotAContract(address)", deployer);
       vm.expectRevert(err);
       kernel.executeAction(Actions.InstallModule, deployer);
 
       Module invalidModule = new InvalidMockModule(kernel);
-      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Kernel.Keycode.wrap("badkc"));
+      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap("badkc"));
       vm.expectRevert(err);
       kernel.executeAction(Actions.InstallModule, address(invalidModule));
 
@@ -166,11 +166,11 @@ contract KernelTest is Test {
       
       vm.startPrank(address(kernel));
 
-      err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", Kernel.Keycode.wrap("MOCKY"));
+      err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", Keycode.wrap("MOCKY"));
       vm.expectRevert(err);
       policy.setDependencies();
 
-      assertEq(Kernel.Keycode.unwrap(policy.permissions()[0].keycode), "MOCKY");
+      assertEq(Keycode.unwrap(policy.permissions()[0].keycode), "MOCKY");
       assertEq(policy.permissions()[0].funcSelector, MOCKY.permissionedCall.selector);
 
       vm.stopPrank();
@@ -179,16 +179,16 @@ contract KernelTest is Test {
     function testCorrectness_ApprovePolicy() public {
       vm.startPrank(deployer);
       
-      err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", Kernel.Keycode.wrap("MOCKY"));
+      err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", Keycode.wrap("MOCKY"));
       vm.expectRevert(err);
       kernel.executeAction(Actions.ApprovePolicy, address(policy));
 
       kernel.executeAction(Actions.InstallModule, address(MOCKY));
       kernel.executeAction(Actions.ApprovePolicy, address(policy));
 
-      assertEq(kernel.policyPermissions(policy, Kernel.Keycode.wrap("MOCKY"), MOCKY.permissionedCall.selector), true);
+      assertEq(kernel.policyPermissions(policy, Keycode.wrap("MOCKY"), MOCKY.permissionedCall.selector), true);
       assertEq(address(kernel.allPolicies(0)), address(policy));
-      assertEq(policy.hasDependency(Kernel.Keycode.wrap("MOCKY")), true);
+      assertEq(policy.hasDependency(Keycode.wrap("MOCKY")), true);
 
       policy.callPublicFunction();
       assertEq(MOCKY.publicState(), 1);
@@ -236,7 +236,7 @@ contract KernelTest is Test {
       vm.expectRevert(err);
       policy.callPermissionedFunction();
 
-      assertEq(kernel.policyPermissions(policy, Kernel.Keycode.wrap("MOCKY"), MOCKY.permissionedCall.selector), false);
+      assertEq(kernel.policyPermissions(policy, Keycode.wrap("MOCKY"), MOCKY.permissionedCall.selector), false);
       vm.expectRevert();
       assertEq(address(kernel.allPolicies(0)), address(0));    
     }
@@ -246,7 +246,7 @@ contract KernelTest is Test {
 
       vm.startPrank(deployer);
 
-      err = abi.encodeWithSignature("Kernel_ModuleDoesNotExistForKeycode(bytes5)", Kernel.Keycode.wrap("MOCKY"));
+      err = abi.encodeWithSignature("Kernel_ModuleDoesNotExistForKeycode(bytes5)", Keycode.wrap("MOCKY"));
       vm.expectRevert(err);
       kernel.executeAction(Actions.UpgradeModule, address(upgradedModule));
 

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.13;
 
+import "src/utils/KernelUtils.sol";
+
 // ######################## ~ ERRORS ~ ########################
-
-// AUTH
-
-error Auth_Unauthorized();
 
 // MODULE
 
@@ -13,17 +11,24 @@ error Module_PolicyNotAuthorized();
 
 // POLICY
 
-error Policy_ModuleDoesNotExist(Kernel.Keycode keycode_);
 error Policy_OnlyKernel(address caller_);
+error Policy_OnlyRole(Role role_);
+error Policy_ModuleDoesNotExist(Keycode keycode_);
 
 // KERNEL
 
 error Kernel_OnlyExecutor(address caller_);
-error Kernel_ModuleAlreadyInstalled(Kernel.Keycode module_);
-error Kernel_ModuleAlreadyExists(Kernel.Keycode module_);
+error Kernel_OnlyAdmin(address caller_);
+error Kernel_ModuleAlreadyInstalled(Keycode module_);
+error Kernel_InvalidModuleUpgrade(Keycode module_);
 error Kernel_PolicyAlreadyApproved(address policy_);
 error Kernel_PolicyNotApproved(address policy_);
-error Kernel_MaxPoliciesReached();
+error Kernel_AddressAlreadyHasRole(address address_);
+error Kernel_RoleAlreadyExistsForAddress(Role role_);
+error Kernel_RoleDoesNotExistForAddress(address address_);
+error Kernel_InvalidTargetNotAContract(address target_);
+error Kernel_InvalidKeycode(Keycode keycode_);
+error Kernel_InvalidRole(Role role_);
 
 // ######################## ~ GLOBAL TYPES ~ ########################
 
@@ -32,7 +37,8 @@ enum Actions {
     UpgradeModule,
     ApprovePolicy,
     TerminatePolicy,
-    ChangeExecutor
+    ChangeExecutor,
+    ChangeAdmin
 }
 
 struct Instruction {
@@ -41,7 +47,7 @@ struct Instruction {
 }
 
 struct Permissions {
-    Kernel.Keycode keycode;
+    Keycode keycode;
     bytes4 funcSelector;
 }
 
@@ -56,20 +62,28 @@ abstract contract Module {
         kernel = kernel_;
     }
 
+    modifier onlyKernel() {
+        if (msg.sender != address(kernel)) revert Policy_OnlyKernel(msg.sender);
+        _;
+    }
+
     modifier permissioned() {
         if (!kernel.policyPermissions(Policy(msg.sender), KEYCODE(), msg.sig))
             revert Module_PolicyNotAuthorized();
         _;
     }
 
-    function KEYCODE() public pure virtual returns (Kernel.Keycode);
+    function KEYCODE() public pure virtual returns (Keycode);
 
     /// @notice Specify which version of a module is being implemented.
     /// @dev Minor version change retains interface. Major version upgrade indicates
     ///      breaking change to the interface.
     function VERSION() external pure virtual returns (uint8 major, uint8 minor) {}
 
-    function INIT() external virtual {}
+    /// @notice Initialization function for the module.
+    /// @dev This function is called when the module is installed or upgraded by the kernel.
+    /// @dev Used to encompass any upgrade logic.
+    function INIT() external virtual onlyKernel {}
 }
 
 abstract contract Policy {
@@ -84,36 +98,33 @@ abstract contract Policy {
         _;
     }
 
+    modifier onlyRole(Role role_) {
+        if (fromRole(kernel.getRoleOfAddress(msg.sender)) != fromRole(role_))
+            revert Policy_OnlyRole(role_);
+        _;
+    }
+
     function configureDependencies()
         external
         virtual
-        returns (Kernel.Keycode[] memory dependencies)
+        returns (Keycode[] memory dependencies)
     {}
 
     function requestPermissions() external view virtual returns (Permissions[] memory requests) {}
 
-    function getModuleAddress(Kernel.Keycode keycode_) internal view returns (address) {
+    function getModuleAddress(Keycode keycode_) internal view returns (address) {
         address moduleForKeycode = address(kernel.getModuleForKeycode(keycode_));
 
         if (moduleForKeycode == address(0)) revert Policy_ModuleDoesNotExist(keycode_);
 
         return moduleForKeycode;
     }
-
-    function _toKeycode(bytes5 keycode_) internal pure returns (Kernel.Keycode) {
-        return Kernel.Keycode.wrap(keycode_);
-    }
-
-    function _fromKeycode(Kernel.Keycode keycode_) internal pure returns (bytes5) {
-        return Kernel.Keycode.unwrap(keycode_);
-    }
 }
 
 contract Kernel {
     // ######################## ~ VARS ~ ########################
-
-    type Keycode is bytes5;
     address public executor;
+    address public admin;
 
     // ######################## ~ DEPENDENCY MANAGEMENT ~ ########################
 
@@ -126,8 +137,12 @@ contract Kernel {
     Policy[] public allPolicies; // Length of this array is number of approved policies
     mapping(Policy => uint256) public getPolicyIndex; // Reverse lookup for policy index
 
-    // Policy <> Module Permissions
+    // Module <> Policy Permissions
     mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
+
+    // Policy Roles
+    mapping(address => Role) public getRoleOfAddress;
+    mapping(Role => address) public getAddressOfRole;
 
     // ######################## ~ EVENTS ~ ########################
 
@@ -138,29 +153,57 @@ contract Kernel {
         bool indexed granted_
     );
 
+    event RolesUpdated(Role indexed role_, address indexed addr_, bool indexed granted_);
+
     event ActionExecuted(Actions indexed action_, address indexed target_);
 
     // ######################## ~ BODY ~ ########################
 
     constructor() {
         executor = msg.sender;
+        admin = msg.sender;
     }
 
     // ######################## ~ MODIFIERS ~ ########################
 
+    // Role reserved for governor or any executing address
     modifier onlyExecutor() {
         if (msg.sender != executor) revert Kernel_OnlyExecutor(msg.sender);
+        _;
+    }
+
+    // Role for managing policy roles
+    modifier onlyAdmin() {
+        if (msg.sender != admin) revert Kernel_OnlyAdmin(msg.sender);
         _;
     }
 
     // ######################## ~ KERNEL INTERFACE ~ ########################
 
     function executeAction(Actions action_, address target_) external onlyExecutor {
-        if (action_ == Actions.InstallModule) _installModule(Module(target_));
-        else if (action_ == Actions.UpgradeModule) _upgradeModule(Module(target_));
-        else if (action_ == Actions.ApprovePolicy) _approvePolicy(Policy(target_));
-        else if (action_ == Actions.TerminatePolicy) _terminatePolicy(Policy(target_));
-        else if (action_ == Actions.ChangeExecutor) executor = target_;
+        if (action_ == Actions.InstallModule) {
+            ensureContract(target_);
+            ensureValidKeycode(Module(target_).KEYCODE());
+
+            _installModule(Module(target_));
+        } else if (action_ == Actions.UpgradeModule) {
+            ensureContract(target_);
+            ensureValidKeycode(Module(target_).KEYCODE());
+
+            _upgradeModule(Module(target_));
+        } else if (action_ == Actions.ApprovePolicy) {
+            ensureContract(target_);
+
+            _approvePolicy(Policy(target_));
+        } else if (action_ == Actions.TerminatePolicy) {
+            ensureContract(target_);
+
+            _terminatePolicy(Policy(target_));
+        } else if (action_ == Actions.ChangeExecutor) {
+            executor = target_;
+        } else if (action_ == Actions.ChangeAdmin) {
+            admin = target_;
+        }
 
         emit ActionExecuted(action_, target_);
     }
@@ -175,6 +218,8 @@ contract Kernel {
 
         getModuleForKeycode[keycode] = newModule_;
         getKeycodeForModule[newModule_] = keycode;
+
+        newModule_.INIT();
     }
 
     function _upgradeModule(Module newModule_) internal {
@@ -182,11 +227,13 @@ contract Kernel {
         Module oldModule = getModuleForKeycode[keycode];
 
         if (address(oldModule) == address(0) || oldModule == newModule_)
-            revert Kernel_ModuleAlreadyExists(keycode);
+            revert Kernel_InvalidModuleUpgrade(keycode);
 
         getKeycodeForModule[oldModule] = Keycode.wrap(bytes5(0));
         getKeycodeForModule[newModule_] = keycode;
         getModuleForKeycode[keycode] = newModule_;
+
+        newModule_.INIT();
 
         _reconfigurePolicies(keycode);
     }
@@ -315,5 +362,23 @@ contract Kernel {
                 ++i;
             }
         }
+    }
+
+    function registerRole(address address_, Role role_) public onlyAdmin {
+        if (fromRole(getRoleOfAddress[address_]) != bytes32(0))
+            revert Kernel_AddressAlreadyHasRole(address_);
+        if (getAddressOfRole[role_] != address(0)) revert Kernel_RoleAlreadyExistsForAddress(role_);
+        ensureValidRole(role_);
+
+        getRoleOfAddress[address_] = role_;
+        getAddressOfRole[role_] = address_;
+    }
+
+    function revokeRole(address address_) public onlyAdmin {
+        Role roleOfAddress = getRoleOfAddress[address_];
+        if (getAddressOfRole[roleOfAddress] == address(0))
+            revert Kernel_RoleDoesNotExistForAddress(address_);
+        getAddressOfRole[roleOfAddress] = address(0);
+        getRoleOfAddress[address_] = Role.wrap(bytes32(0));
     }
 }

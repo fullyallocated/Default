@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.13;
 
-import { Kernel, Module, Actions, Instruction } from "src/Kernel.sol";
+import "src/Kernel.sol";
 
 error INSTR_InstructionsCannotBeEmpty();
 error INSTR_InvalidChangeExecutorAction();
@@ -18,8 +18,8 @@ contract DefaultInstructions is Module {
 
     constructor(Kernel kernel_) Module(kernel_) {}
 
-    function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.Keycode.wrap("INSTR");
+    function KEYCODE() public pure override returns (Keycode) {
+        return Keycode.wrap("INSTR");
     }
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -98,8 +98,8 @@ contract DefaultInstructions is Module {
         if (size == 0) revert INSTR_InvalidTargetNotAContract();
     }
 
-    function _ensureValidKeycode(Kernel.Keycode keycode_) internal pure {
-        bytes5 unwrapped = Kernel.Keycode.unwrap(keycode_);
+    function _ensureValidKeycode(Keycode keycode_) internal pure {
+        bytes5 unwrapped = Keycode.unwrap(keycode_);
 
         for (uint256 i = 0; i < 5; ) {
             bytes1 char = unwrapped[i];

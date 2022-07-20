@@ -58,7 +58,7 @@ abstract contract Module {
 
     modifier permissioned() {
         if (!kernel.policyPermissions(Policy(msg.sender), KEYCODE(), msg.sig))
-          revert Module_PolicyNotAuthorized();
+            revert Module_PolicyNotAuthorized();
         _;
     }
 
@@ -67,17 +67,9 @@ abstract contract Module {
     /// @notice Specify which version of a module is being implemented.
     /// @dev Minor version change retains interface. Major version upgrade indicates
     ///      breaking change to the interface.
-    function VERSION()
-        external
-        pure
-        virtual
-        returns (uint8 major, uint8 minor)
-    {}
+    function VERSION() external pure virtual returns (uint8 major, uint8 minor) {}
 
-    function INIT()
-        external
-        virtual
-    {}
+    function INIT() external virtual {}
 }
 
 abstract contract Policy {
@@ -92,22 +84,18 @@ abstract contract Policy {
         _;
     }
 
-    function configureDependencies() 
+    function configureDependencies()
         external
         virtual
-        returns (Kernel.Keycode[] memory dependencies) {}
+        returns (Kernel.Keycode[] memory dependencies)
+    {}
 
-    function requestPermissions()
-        external
-        view
-        virtual
-        returns (Permissions[] memory requests) {}
+    function requestPermissions() external view virtual returns (Permissions[] memory requests) {}
 
     function getModuleAddress(Kernel.Keycode keycode_) internal view returns (address) {
         address moduleForKeycode = address(kernel.getModuleForKeycode(keycode_));
 
-        if (moduleForKeycode == address(0))
-            revert Policy_ModuleDoesNotExist(keycode_);
+        if (moduleForKeycode == address(0)) revert Policy_ModuleDoesNotExist(keycode_);
 
         return moduleForKeycode;
     }
@@ -122,7 +110,6 @@ abstract contract Policy {
 }
 
 contract Kernel {
-    
     // ######################## ~ VARS ~ ########################
 
     type Keycode is bytes5;
@@ -134,8 +121,8 @@ contract Kernel {
     mapping(Keycode => Module) public getModuleForKeycode; // get contract for module keycode
     mapping(Module => Keycode) public getKeycodeForModule; // get module keycode for contract
     mapping(Keycode => Policy[]) public moduleDependents;
+    mapping(Keycode => mapping(Policy => uint256)) public getDependentIndex;
 
-    uint256 constant MAX_POLICIES = 256;
     Policy[] public allPolicies; // Length of this array is number of approved policies
     mapping(Policy => uint256) public getPolicyIndex; // Reverse lookup for policy index
 
@@ -168,21 +155,12 @@ contract Kernel {
 
     // ######################## ~ KERNEL INTERFACE ~ ########################
 
-    function executeAction(Actions action_, address target_)
-        external
-        onlyExecutor
-    {
-        if (action_ == Actions.InstallModule)
-            _installModule(Module(target_));
-        else if (action_ == Actions.UpgradeModule)
-          _upgradeModule(Module(target_));
-        else if (action_ == Actions.ApprovePolicy)
-          _approvePolicy(Policy(target_));
-        else if (action_ == Actions.TerminatePolicy)
-          _terminatePolicy(Policy(target_));
-        else if (action_ == Actions.ChangeExecutor)
-          executor = target_;
-        
+    function executeAction(Actions action_, address target_) external onlyExecutor {
+        if (action_ == Actions.InstallModule) _installModule(Module(target_));
+        else if (action_ == Actions.UpgradeModule) _upgradeModule(Module(target_));
+        else if (action_ == Actions.ApprovePolicy) _approvePolicy(Policy(target_));
+        else if (action_ == Actions.TerminatePolicy) _terminatePolicy(Policy(target_));
+        else if (action_ == Actions.ChangeExecutor) executor = target_;
 
         emit ActionExecuted(action_, target_);
     }
@@ -219,37 +197,38 @@ contract Kernel {
         _setPolicyPermissions(policy_, requests, true);
 
         // Add policy to list of active policies
-        uint256 numPolicies = allPolicies.length;
-
-        if (numPolicies == MAX_POLICIES)
-            revert Kernel_MaxPoliciesReached();
-        else {
-            allPolicies.push(policy_);
-            // Can use numPolicies since it is now incremented.
-            getPolicyIndex[policy_] = numPolicies;
-        }
+        allPolicies.push(policy_);
+        getPolicyIndex[policy_] = allPolicies.length;
 
         // Record module dependencies
         Keycode[] memory dependencies = policy_.configureDependencies();
         uint256 depLength = dependencies.length;
 
-        for (uint256 i; i < depLength;) {
-            moduleDependents[dependencies[i]].push(policy_);
-            unchecked { ++i; }
+        for (uint256 i; i < depLength; ) {
+            Keycode keycode = dependencies[i];
+
+            moduleDependents[keycode].push(policy_);
+            getDependentIndex[keycode][policy_] = moduleDependents[keycode].length;
+
+            unchecked {
+                ++i;
+            }
         }
     }
 
     function _terminatePolicy(Policy policy_) internal {
+        // Revoke permissions
         Permissions[] memory requests = policy_.requestPermissions();
         _setPolicyPermissions(policy_, requests, false);
 
-        // Remove policy from total policy data structures
+        // Remove policy from all policy data structures
         uint256 idx = getPolicyIndex[policy_];
         Policy lastPolicy = allPolicies[allPolicies.length - 1];
 
         allPolicies[idx] = lastPolicy;
-        getPolicyIndex[lastPolicy] = idx;
         allPolicies.pop();
+        getPolicyIndex[lastPolicy] = idx;
+        delete getPolicyIndex[policy_];
 
         // Remove policy from module dependents
         _pruneFromDependents(policy_);
@@ -261,6 +240,7 @@ contract Kernel {
 
         for (uint256 i; i < depLength; ) {
             dependents[i].configureDependencies();
+
             unchecked {
                 ++i;
             }
@@ -281,12 +261,13 @@ contract Kernel {
             emit PermissionsUpdated(policy_, request.keycode, request.funcSelector, grant_);
 
             unchecked {
-                i++;
+                ++i;
             }
         }
     }
 
-    // TODO Naiive implementation. O(n*m). Optimize if possible.
+    /*
+    // TODO Naiive implementation. O(n*m). Optimize.
     function _pruneFromDependents(Policy policy_) internal {
         Keycode[] memory dependencies = policy_.configureDependencies();
         uint256 depcLength = dependencies.length;
@@ -297,7 +278,10 @@ contract Kernel {
 
             for (uint256 j; j < deptLength; ) {
                 if (dependents[j] == policy_) {
-                    dependents[j] = dependents[deptLength - 1];
+                    // Swap with last element if its not last element
+                    if(j != deptLength - 1) {
+                        dependents[j] = dependents[deptLength - 1];
+                    }
                     dependents.pop();
                     break;
                 }
@@ -305,6 +289,31 @@ contract Kernel {
             }
             unchecked { ++i; }
         }
+    }
+    */
 
+    function _pruneFromDependents(Policy policy_) internal {
+        Keycode[] memory dependencies = policy_.configureDependencies();
+        uint256 depcLength = dependencies.length;
+
+        for (uint256 i; i < depcLength; ) {
+            Keycode keycode = dependencies[i];
+            Policy[] storage dependents = moduleDependents[keycode];
+
+            uint256 origIndex = getDependentIndex[keycode][policy_];
+            Policy lastPolicy = dependents[dependents.length - 1];
+
+            // Swap with last and pop
+            dependents[origIndex] = lastPolicy;
+            dependents.pop();
+
+            // Record new index and delete terminated policy index
+            getDependentIndex[keycode][lastPolicy] = origIndex;
+            delete getDependentIndex[keycode][policy_];
+
+            unchecked {
+                ++i;
+            }
+        }
     }
 }

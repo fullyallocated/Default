@@ -22,5 +22,11 @@
     "prettier": "^2.5.1",
     "prettier-plugin-solidity": "^1.0.0-beta.19",
     "solhint": "^3.3.6"
+  },
+  "prettier": {
+    "tabWidth": 4,
+    "singleQuote": false,
+    "bracketSpacing": true,
+    "printWidth": 100
   }
 }

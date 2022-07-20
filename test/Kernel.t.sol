@@ -4,8 +4,9 @@ pragma solidity ^0.8.13;
 //import {Test} from "forge-std/Test.sol";
 import { PRBTest } from "prb-test/PRBTest.sol";
 
-import "src/Kernel.sol";
 import {MockModule, MockPolicy} from "./mocks/MockPolicyModule.sol";
+import {UserFactory} from "./utils/UserFactory.sol";
+import "src/Kernel.sol";
 //import {MockModule} from "./mocks/MockModule.sol";
 //import {MockPolicy} from "./mocks/MockPolicy.sol";
 
@@ -13,6 +14,13 @@ contract KernelTest is PRBTest {
     Kernel internal kernel;
     MockPolicy internal mockPolicy;
     MockModule internal MOCKY;
+
+    address deployer;
+    address multisig;
+    address user;
+    UserFactory userFactory;
+
+    bytes err;
 
     MockPolicy internal policyTest;
 

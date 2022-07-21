@@ -2,8 +2,8 @@
 pragma solidity ^0.8.13;
 
 import {Test} from "forge-std/Test.sol";
-import {MockModule, MockPolicy} from "./mocks/MockPolicyModule.sol";
 import {UserFactory} from "test-utils/UserFactory.sol";
+import "./mocks/KernelTestMocks.sol";
 import "src/Kernel.sol";
 
 contract KernelTest is Test {
@@ -16,6 +16,7 @@ contract KernelTest is Test {
     address public user;
     UserFactory public userFactory;
 
+    bytes public err;
     MockPolicy internal policyTest;
 
     function setUp() public {
@@ -33,9 +34,9 @@ contract KernelTest is Test {
       vm.stopPrank();
     }
 
-    function testCorrectness_IntializeKernel() public {
+    function testCorrectness_InitializeKernel() public {
       Keycode keycode = Keycode.wrap(0);
-      Kernel.Identity identity = Kernel.Identity.wrap(0);
+      Role role = Role.wrap(0);
 
       assertEq(kernel.admin(), deployer);
       assertEq(kernel.executor(), deployer);
@@ -50,83 +51,83 @@ contract KernelTest is Test {
 
       err = abi.encodeWithSignature("Kernel_OnlyAdmin(address)", address(this));
       vm.expectRevert(err);
-      kernel.registerIdentity(address(deployer), Kernel.Identity.wrap("executor"));
+      kernel.registerRole(address(deployer), Role.wrap("executor"));
 
       err = abi.encodeWithSignature("Kernel_OnlyAdmin(address)", address(this));
       vm.expectRevert(err);
-      kernel.revokeIdentity(deployer);
+      kernel.revokeRole(deployer);
     }
 
     function testCorrectness_EnsureContract() public {
 
-      kernel.ensureContract(address(kernel)); 
+      ensureContract(address(kernel)); 
 
       err = abi.encodeWithSignature("Kernel_InvalidTargetNotAContract(address)", address(deployer));
       vm.expectRevert(err);
-      kernel.ensureContract(deployer);
+      ensureContract(deployer);
 
       err = abi.encodeWithSignature("Kernel_InvalidTargetNotAContract(address)", address(0));
       vm.expectRevert(err);
-      kernel.ensureContract(address(0));
+      ensureContract(address(0));
     }
 
     function testCorrectness_EnsureValidKeycode() public {
 
-      kernel.ensureValidKeycode(Keycode.wrap("VALID")); 
+      ensureValidKeycode(Keycode.wrap("VALID")); 
 
       err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap("inval"));
       vm.expectRevert(err);
-      kernel.ensureValidKeycode(Keycode.wrap("inval"));
+      ensureValidKeycode(Keycode.wrap("inval"));
 
       err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap(""));
       vm.expectRevert(err);
-      kernel.ensureValidKeycode(Keycode.wrap(bytes5("")));
+      ensureValidKeycode(Keycode.wrap(bytes5("")));
     }
 
-    function testCorrectness_EnsureValidIdentity() public {
+    function testCorrectness_EnsureValidRole() public {
 
-      kernel.ensureValidIdentity(Kernel.Identity.wrap("valid")); 
+      ensureValidRole(Role.wrap("valid")); 
 
-      err = abi.encodeWithSignature("Kernel_InvalidIdentity(bytes10)", Kernel.Identity.wrap("invalid_id"));
+      err = abi.encodeWithSignature("Kernel_InvalidRole(bytes32)", Role.wrap("invalid_id"));
       vm.expectRevert(err);
-      kernel.ensureValidIdentity(Kernel.Identity.wrap("invalid_id"));
+      ensureValidRole(Role.wrap("invalid_id"));
 
-      err = abi.encodeWithSignature("Kernel_InvalidIdentity(bytes10)", Kernel.Identity.wrap("INVALID_ID"));
+      err = abi.encodeWithSignature("Kernel_InvalidIdentity(bytes32)", Role.wrap("INVALID_ID"));
       vm.expectRevert(err);
-      kernel.ensureValidIdentity(Kernel.Identity.wrap(bytes10("INVALID_ID")));
+      ensureValidRole(Role.wrap(bytes32("INVALID_ID")));
     }
     
-    function testCorrectness_RegisterIdentity() public {
+    function testCorrectness_RegisterRole() public {
       err = abi.encodeWithSignature("Kernel_OnlyAdmin(address)", address(this));
       vm.expectRevert(err);
-      kernel.registerIdentity(multisig, Kernel.Identity.wrap("tester"));
+      kernel.registerRole(multisig, Role.wrap("tester"));
 
       vm.startPrank(deployer);
-      kernel.registerIdentity(multisig, Kernel.Identity.wrap("tester"));
-      assertEq(Kernel.Identity.unwrap(kernel.getIdentityOfAddress(multisig)), "tester");
-      assertEq(kernel.getAddressOfIdentity(Kernel.Identity.wrap("tester")), multisig);
+      kernel.registerRole(multisig, Role.wrap("tester"));
+      assertEq(Role.unwrap(kernel.getRoleOfAddress(multisig)), "tester");
+      assertEq(kernel.getAddressOfRole(Role.wrap("tester")), multisig);
     }
 
-    function testCorrectness_RevokeIdentity() public {
+    function testCorrectness_RevokeRole() public {
       err = abi.encodeWithSignature("Kernel_OnlyAdmin(address)", address(this));
       vm.expectRevert(err);
-      kernel.revokeIdentity(deployer);
+      kernel.revokeRole(deployer);
 
       vm.startPrank(deployer);
-      kernel.registerIdentity(multisig, Kernel.Identity.wrap("tester"));
-      assertEq(Kernel.Identity.unwrap(kernel.getIdentityOfAddress(multisig)), "tester");
-      assertEq(kernel.getAddressOfIdentity(Kernel.Identity.wrap("tester")), multisig);
+      kernel.registerRole(multisig, Role.wrap("tester"));
+      assertEq(Role.unwrap(kernel.getRoleOfAddress(multisig)), "tester");
+      assertEq(kernel.getAddressOfRole(Role.wrap("tester")), multisig);
 
-      kernel.revokeIdentity(multisig);
-      assertEq(Kernel.Identity.unwrap(kernel.getIdentityOfAddress(multisig)), bytes10(0));
-      assertEq(kernel.getAddressOfIdentity(Kernel.Identity.wrap("tester")), address(0));
+      kernel.revokeRole(multisig);
+      assertEq(Role.unwrap(kernel.getRoleOfAddress(multisig)), bytes10(0));
+      assertEq(kernel.getAddressOfRole(Role.wrap("tester")), address(0));
 
-      err = abi.encodeWithSignature("Kernel_IdentityDoesNotExistForAddress(address)", address(multisig));
+      err = abi.encodeWithSignature("Kernel_RoleDoesNotExistForAddress(address)", address(multisig));
       vm.expectRevert(err);
-      kernel.revokeIdentity(multisig);
+      kernel.revokeRole(multisig);
     }
 
-    function testCorrectness_IntializeModule() public {
+    function testCorrectness_InitializeModule() public {
       assertEq(Keycode.unwrap(MOCKY.KEYCODE()), "MOCKY");
       assertEq(MOCKY.publicState(), 0);
       assertEq(MOCKY.permissionedState(), 0);
@@ -155,51 +156,65 @@ contract KernelTest is Test {
       vm.stopPrank();
     }
 
-    function testCorrectness_IntializePolicy() public {
-      err = abi.encodeWithSignature("Policy_OnlyKernel(address)", address(this));
-      vm.expectRevert(err);
-      policy.setDependencies();
-
-      err = abi.encodeWithSignature("Policy_OnlyKernel(address)", address(this));
-      vm.expectRevert(err);
-      policy.permissions();
-      
-      vm.startPrank(address(kernel));
-
+    function testCorrectness_PolicyPermissions() public {
       err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", Keycode.wrap("MOCKY"));
       vm.expectRevert(err);
-      policy.setDependencies();
+      //policy.requestPermissions();
+      Permissions[] memory permissions = policy.requestPermissions();
 
-      assertEq(Keycode.unwrap(policy.permissions()[0].keycode), "MOCKY");
-      assertEq(policy.permissions()[0].funcSelector, MOCKY.permissionedCall.selector);
+      assertEq(Keycode.unwrap(permissions[0].keycode), "MOCKY");
+      assertEq(permissions[0].funcSelector, MOCKY.permissionedCall.selector);
+    }
 
+    // TODO Move to bottom or separate file
+    function _approveTestPolicy() internal {
+      vm.startPrank(deployer);
+      kernel.executeAction(Actions.InstallModule, address(MOCKY));
+      kernel.executeAction(Actions.ApprovePolicy, address(policy));
       vm.stopPrank();
     }
 
     function testCorrectness_ApprovePolicy() public {
-      vm.startPrank(deployer);
-      
-      err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", Keycode.wrap("MOCKY"));
+      //vm.startPrank(deployer);
+      Keycode testKeycode = Keycode.wrap("MOCKY");
+
+      vm.prank(deployer);
+      err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", testKeycode);
       vm.expectRevert(err);
       kernel.executeAction(Actions.ApprovePolicy, address(policy));
 
-      kernel.executeAction(Actions.InstallModule, address(MOCKY));
-      kernel.executeAction(Actions.ApprovePolicy, address(policy));
+      _approveTestPolicy();
 
-      assertEq(kernel.policyPermissions(policy, Keycode.wrap("MOCKY"), MOCKY.permissionedCall.selector), true);
+      assertEq(kernel.policyPermissions(policy, testKeycode, MOCKY.permissionedCall.selector), true);
       assertEq(address(kernel.allPolicies(0)), address(policy));
-      assertEq(policy.hasDependency(Keycode.wrap("MOCKY")), true);
 
+      uint256 depIndex = kernel.getDependentIndex(testKeycode, policy);
+      Policy[] memory dependencies = new Policy[](1);
+      dependencies[0] = policy;
+      assertEq(address(kernel.moduleDependents(testKeycode, depIndex)), address(dependencies[0]));
+    }
+
+    function testCorrectness_CallPublicPolicyFunction() public {
+      _approveTestPolicy();
+
+      vm.prank(deployer);
       policy.callPublicFunction();
+
       assertEq(MOCKY.publicState(), 1);
+    }
 
-      // test identity-based auth for policy calls
+    function testCorrectness_CallPermissionedPolicyFunction() public {
+      _approveTestPolicy();
 
-      err = abi.encodeWithSignature("Policy_OnlyIdentity(bytes10)", Kernel.Identity.wrap("tester"));
+      // Test role-based auth for policy calls
+      Role testerRole = Role.wrap("tester");
+
+      vm.startPrank(deployer);
+      err = abi.encodeWithSignature("Policy_OnlyRole(bytes32)", testerRole);
       vm.expectRevert(err);
       policy.callPermissionedFunction();
 
-      kernel.registerIdentity(multisig, Kernel.Identity.wrap("tester"));
+      kernel.registerRole(multisig, testerRole);
       vm.stopPrank();
 
       vm.prank(multisig);
@@ -207,10 +222,10 @@ contract KernelTest is Test {
       assertEq(MOCKY.permissionedState(), 1);
 
       vm.prank(deployer);
-      kernel.revokeIdentity(multisig);
+      kernel.revokeRole(multisig);
 
       vm.prank(multisig);
-      err = abi.encodeWithSignature("Policy_OnlyIdentity(bytes10)", Kernel.Identity.wrap("tester"));
+      err = abi.encodeWithSignature("Policy_OnlyRole(bytes32)", testerRole);
       vm.expectRevert(err);
       policy.callPermissionedFunction();
     }
@@ -221,7 +236,7 @@ contract KernelTest is Test {
       kernel.executeAction(Actions.InstallModule, address(MOCKY));
       kernel.executeAction(Actions.ApprovePolicy, address(policy));
 
-      kernel.registerIdentity(multisig, Kernel.Identity.wrap("tester"));
+      kernel.registerRole(multisig, Role.wrap("tester"));
 
       err = abi.encodeWithSignature("Kernel_PolicyAlreadyApproved(address)", address(policy));
       vm.expectRevert(err);
@@ -256,7 +271,7 @@ contract KernelTest is Test {
       kernel.executeAction(Actions.UpgradeModule, address(MOCKY));
 
       kernel.executeAction(Actions.ApprovePolicy, address(policy));
-      kernel.registerIdentity(multisig, Kernel.Identity.wrap("tester"));
+      kernel.registerRole(multisig, Role.wrap("tester"));
       
       vm.stopPrank();
 
@@ -315,7 +330,7 @@ contract KernelTest is Test {
 
         vm.prank(multisig);
 
-        kernel.registerIdentity(user, Kernel.Identity.wrap("tester"));
+        kernel.registerRole(user, Role.wrap("tester"));
         vm.prank(user);
         policy.callPermissionedFunction();
 
@@ -325,15 +340,15 @@ contract KernelTest is Test {
         vm.startPrank(multisig);
         err = abi.encodeWithSignature("Kernel_OnlyAdmin(address)", multisig);
         vm.expectRevert(err);
-        kernel.registerIdentity(multisig, Kernel.Identity.wrap("tester"));
+        kernel.registerRole(multisig, Role.wrap("tester"));
         vm.stopPrank();
 
         vm.prank(user);
-        kernel.revokeIdentity(user);
-        assertEq(Kernel.Identity.unwrap(kernel.getIdentityOfAddress(user)), bytes10(0));
-        assertEq(kernel.getAddressOfIdentity(Kernel.Identity.wrap("tester")), address(0));  
+        kernel.revokeRole(user);
+        assertEq(Role.unwrap(kernel.getRoleOfAddress(user)), bytes10(0));
+        assertEq(kernel.getAddressOfRole(Role.wrap("tester")), address(0));  
         
-        err = abi.encodeWithSignature("Policy_OnlyIdentity(bytes10)", Kernel.Identity.wrap("tester"));
+        err = abi.encodeWithSignature("Policy_OnlyIdentity(bytes10)", Role.wrap("tester"));
         vm.expectRevert(err);
         vm.prank(user);
         policy.callPermissionedFunction();

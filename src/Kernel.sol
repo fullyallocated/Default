@@ -255,7 +255,7 @@ contract Kernel {
             Keycode keycode = dependencies[i];
 
             moduleDependents[keycode].push(policy_);
-            getDependentIndex[keycode][policy_] = moduleDependents[keycode].length;
+            getDependentIndex[keycode][policy_] = moduleDependents[keycode].length-1;
 
             unchecked {
                 ++i;

@@ -135,15 +135,15 @@ contract Kernel {
     mapping(Keycode => mapping(Policy => uint256)) public getDependentIndex;
 
     // Length of this array is number of approved policies
-    Policy[] public allPolicies; 
+    Policy[] public activePolicies;
     // Reverse lookup for policy index. Offset by 1 to be able to use 0 as a null value
-    mapping(Policy => uint256) public getPolicyIndex; 
+    mapping(Policy => uint256) public getPolicyIndex;
 
     // Module <> Policy Permissions
     mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
 
     // Policy Roles
-    mapping(Role => bool) public isActiveRole;
+    //mapping(Role => bool) public isActiveRole; // TODO
     mapping(address => Role) public getRoleOfAddress;
     mapping(Role => address) public getAddressOfRole;
 
@@ -242,17 +242,16 @@ contract Kernel {
     }
 
     function _approvePolicy(Policy policy_) internal {
-        //uint256 policyIndex = getPolicyIndex[policy_];
-        //if (policyIndex == 0 && allPolicies[policyIndex] == policy_)
-        //    revert Kernel_PolicyNotApproved(address(policy_));
+        if (getPolicyIndex[policy_] != 0)
+            revert Kernel_PolicyAlreadyApproved(address(policy_));
 
         // Grant permissions for policy to access restricted module functions
         Permissions[] memory requests = policy_.requestPermissions();
         _setPolicyPermissions(policy_, requests, true);
 
         // Add policy to list of active policies
-        allPolicies.push(policy_);
-        getPolicyIndex[policy_] = allPolicies.length - 1;
+        activePolicies.push(policy_);
+        getPolicyIndex[policy_] = activePolicies.length;
 
         // Record module dependencies
         Keycode[] memory dependencies = policy_.configureDependencies();
@@ -271,17 +270,20 @@ contract Kernel {
     }
 
     function _terminatePolicy(Policy policy_) internal {
+        if (getPolicyIndex[policy_] != 0)
+            revert Kernel_PolicyNotApproved(address(policy_));
+
         // Revoke permissions
         Permissions[] memory requests = policy_.requestPermissions();
         _setPolicyPermissions(policy_, requests, false);
 
         // Remove policy from all policy data structures
-        uint256 idx = getPolicyIndex[policy_];
-        Policy lastPolicy = allPolicies[allPolicies.length - 1];
+        uint256 idx = getPolicyIndex[policy_] - 1;
+        Policy lastPolicy = activePolicies[activePolicies.length - 1];
 
-        allPolicies[idx] = lastPolicy;
-        allPolicies.pop();
-        getPolicyIndex[lastPolicy] = idx;
+        activePolicies[idx] = lastPolicy;
+        activePolicies.pop();
+        getPolicyIndex[lastPolicy] = idx + 1;
         delete getPolicyIndex[policy_];
 
         // Remove policy from module dependents

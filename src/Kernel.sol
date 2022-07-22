@@ -98,9 +98,9 @@ abstract contract Policy {
         _;
     }
 
-    modifier onlyRole(Role role_) {
-        if (fromRole(kernel.getRoleOfAddress(msg.sender)) != fromRole(role_))
-            revert Policy_OnlyRole(role_);
+    modifier onlyRole(bytes32 role_) {
+        if (fromRole(kernel.getRoleOfAddress(msg.sender)) != role_)
+            revert Policy_OnlyRole(Role.wrap(role_));
         _;
     }
 
@@ -134,13 +134,16 @@ contract Kernel {
     mapping(Keycode => Policy[]) public moduleDependents;
     mapping(Keycode => mapping(Policy => uint256)) public getDependentIndex;
 
-    Policy[] public allPolicies; // Length of this array is number of approved policies
-    mapping(Policy => uint256) public getPolicyIndex; // Reverse lookup for policy index
+    // Length of this array is number of approved policies
+    Policy[] public allPolicies; 
+    // Reverse lookup for policy index. Offset by 1 to be able to use 0 as a null value
+    mapping(Policy => uint256) public getPolicyIndex; 
 
     // Module <> Policy Permissions
     mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
 
     // Policy Roles
+    mapping(Role => bool) public isActiveRole;
     mapping(address => Role) public getRoleOfAddress;
     mapping(Role => address) public getAddressOfRole;
 
@@ -239,13 +242,17 @@ contract Kernel {
     }
 
     function _approvePolicy(Policy policy_) internal {
+        //uint256 policyIndex = getPolicyIndex[policy_];
+        //if (policyIndex == 0 && allPolicies[policyIndex] == policy_)
+        //    revert Kernel_PolicyNotApproved(address(policy_));
+
         // Grant permissions for policy to access restricted module functions
         Permissions[] memory requests = policy_.requestPermissions();
         _setPolicyPermissions(policy_, requests, true);
 
         // Add policy to list of active policies
         allPolicies.push(policy_);
-        getPolicyIndex[policy_] = allPolicies.length;
+        getPolicyIndex[policy_] = allPolicies.length - 1;
 
         // Record module dependencies
         Keycode[] memory dependencies = policy_.configureDependencies();
@@ -302,7 +309,6 @@ contract Kernel {
         uint256 reqLength = requests_.length;
         for (uint256 i = 0; i < reqLength; ) {
             Permissions memory request = requests_[i];
-
             policyPermissions[policy_][request.keycode][request.funcSelector] = grant_;
 
             emit PermissionsUpdated(policy_, request.keycode, request.funcSelector, grant_);
@@ -367,7 +373,9 @@ contract Kernel {
     function registerRole(address address_, Role role_) public onlyAdmin {
         if (fromRole(getRoleOfAddress[address_]) != bytes32(0))
             revert Kernel_AddressAlreadyHasRole(address_);
-        if (getAddressOfRole[role_] != address(0)) revert Kernel_RoleAlreadyExistsForAddress(role_);
+        if (getAddressOfRole[role_] != address(0))
+            revert Kernel_RoleAlreadyExistsForAddress(role_);
+
         ensureValidRole(role_);
 
         getRoleOfAddress[address_] = role_;
@@ -378,6 +386,7 @@ contract Kernel {
         Role roleOfAddress = getRoleOfAddress[address_];
         if (getAddressOfRole[roleOfAddress] == address(0))
             revert Kernel_RoleDoesNotExistForAddress(address_);
+
         getAddressOfRole[roleOfAddress] = address(0);
         getRoleOfAddress[address_] = Role.wrap(bytes32(0));
     }

@@ -13,10 +13,10 @@ contract MockPolicy is Policy {
         override
         returns (Keycode[] memory dependencies)
     {
-        MOCKY = MockModule(getModuleAddress(toKeycode("MOCKY")));
-
         dependencies = new Keycode[](1);
         dependencies[0] = toKeycode("MOCKY");
+
+        MOCKY = MockModule(getModuleAddress(dependencies[0]));
     }
 
     function requestPermissions()
@@ -30,12 +30,11 @@ contract MockPolicy is Policy {
     }
 
     function callPublicFunction() external {
-      MOCKY.publicCall();
+        MOCKY.publicCall();
     }
 
-    // TODO Add identity
-    function callPermissionedFunction() external {
-      MOCKY.permissionedCall();
+    function callPermissionedFunction() onlyRole("tester") external {
+        MOCKY.permissionedCall();
     }
 }
 

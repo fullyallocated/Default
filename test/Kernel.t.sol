@@ -40,11 +40,11 @@ contract KernelTest is Test {
 
       assertEq(kernel.admin(), deployer);
       assertEq(kernel.executor(), deployer);
-
       assertEq(kernel.policyPermissions(policy, keycode, bytes4(0)), false);
       assertEq(address(kernel.getModuleForKeycode(keycode)), address(0));
       assertEq(Keycode.unwrap(kernel.getKeycodeForModule(MOCKY)), bytes5(0));
 
+      // Ensure actions cannot be performed by unauthorized addresses
       err = abi.encodeWithSignature("Kernel_OnlyExecutor(address)", address(this));
       vm.expectRevert(err);
       kernel.executeAction(Actions.InstallModule, address(MOCKY));
@@ -62,11 +62,11 @@ contract KernelTest is Test {
 
       ensureContract(address(kernel)); 
 
-      err = abi.encodeWithSignature("Kernel_InvalidTargetNotAContract(address)", address(deployer));
+      err = abi.encodeWithSignature("TargetNotAContract(address)", address(deployer));
       vm.expectRevert(err);
       ensureContract(deployer);
 
-      err = abi.encodeWithSignature("Kernel_InvalidTargetNotAContract(address)", address(0));
+      err = abi.encodeWithSignature("TargetNotAContract(address)", address(0));
       vm.expectRevert(err);
       ensureContract(address(0));
     }
@@ -75,11 +75,11 @@ contract KernelTest is Test {
 
       ensureValidKeycode(Keycode.wrap("VALID")); 
 
-      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap("inval"));
+      err = abi.encodeWithSignature("InvalidKeycode(bytes5)", Keycode.wrap("inval"));
       vm.expectRevert(err);
       ensureValidKeycode(Keycode.wrap("inval"));
 
-      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap(""));
+      err = abi.encodeWithSignature("InvalidKeycode(bytes5)", Keycode.wrap(""));
       vm.expectRevert(err);
       ensureValidKeycode(Keycode.wrap(bytes5("")));
     }
@@ -88,11 +88,11 @@ contract KernelTest is Test {
 
       ensureValidRole(Role.wrap("valid")); 
 
-      err = abi.encodeWithSignature("Kernel_InvalidRole(bytes32)", Role.wrap("invalid_id"));
+      err = abi.encodeWithSignature("InvalidRole(bytes32)", Role.wrap("invalid_id"));
       vm.expectRevert(err);
       ensureValidRole(Role.wrap("invalid_id"));
 
-      err = abi.encodeWithSignature("Kernel_InvalidIdentity(bytes32)", Role.wrap("INVALID_ID"));
+      err = abi.encodeWithSignature("InvalidIdentity(bytes32)", Role.wrap("INVALID_ID"));
       vm.expectRevert(err);
       ensureValidRole(Role.wrap(bytes32("INVALID_ID")));
     }
@@ -102,7 +102,7 @@ contract KernelTest is Test {
       vm.expectRevert(err);
       kernel.registerRole(multisig, Role.wrap("tester"));
 
-      vm.startPrank(deployer);
+      vm.prank(deployer);
       kernel.registerRole(multisig, Role.wrap("tester"));
       assertEq(Role.unwrap(kernel.getRoleOfAddress(multisig)), "tester");
       assertEq(kernel.getAddressOfRole(Role.wrap("tester")), multisig);
@@ -136,34 +136,28 @@ contract KernelTest is Test {
     function testCorrectness_InstallModule() public {
       vm.startPrank(deployer);
 
+      // Ensure module is installed properly
       kernel.executeAction(Actions.InstallModule, address(MOCKY));
       assertEq(address(kernel.getModuleForKeycode(Keycode.wrap("MOCKY"))), address(MOCKY));
       assertEq(Keycode.unwrap(kernel.getKeycodeForModule(MOCKY)), "MOCKY");
 
-      err = abi.encodeWithSignature("Kernel_InvalidTargetNotAContract(address)", deployer);
+      // Try installing an EOA as a module
+      err = abi.encodeWithSignature("TargetNotAContract(address)", deployer);
       vm.expectRevert(err);
       kernel.executeAction(Actions.InstallModule, deployer);
 
+      // Try installing module with a bad keycode
       Module invalidModule = new InvalidMockModule(kernel);
-      err = abi.encodeWithSignature("Kernel_InvalidModuleKeycode(bytes5)", Keycode.wrap("badkc"));
+      err = abi.encodeWithSignature("InvalidKeycode(bytes5)", Keycode.wrap("badkc"));
       vm.expectRevert(err);
       kernel.executeAction(Actions.InstallModule, address(invalidModule));
 
-      err = abi.encodeWithSignature("Kernel_ModuleAlreadyInstalled(address)", address(MOCKY));
+      // Try installing MOCKY again
+      err = abi.encodeWithSignature("Kernel_ModuleAlreadyInstalled(bytes5)", Keycode.wrap("MOCKY"));
       vm.expectRevert(err);
       kernel.executeAction(Actions.InstallModule, address(MOCKY));
 
       vm.stopPrank();
-    }
-
-    function testCorrectness_PolicyPermissions() public {
-      err = abi.encodeWithSignature("Policy_ModuleDoesNotExist(bytes5)", Keycode.wrap("MOCKY"));
-      vm.expectRevert(err);
-      //policy.requestPermissions();
-      Permissions[] memory permissions = policy.requestPermissions();
-
-      assertEq(Keycode.unwrap(permissions[0].keycode), "MOCKY");
-      assertEq(permissions[0].funcSelector, MOCKY.permissionedCall.selector);
     }
 
     // TODO Move to bottom or separate file
@@ -175,7 +169,6 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_ApprovePolicy() public {
-      //vm.startPrank(deployer);
       Keycode testKeycode = Keycode.wrap("MOCKY");
 
       vm.prank(deployer);
@@ -192,6 +185,18 @@ contract KernelTest is Test {
       Policy[] memory dependencies = new Policy[](1);
       dependencies[0] = policy;
       assertEq(address(kernel.moduleDependents(testKeycode, depIndex)), address(dependencies[0]));
+
+      vm.prank(deployer);
+      err = abi.encodeWithSignature("Kernel_PolicyAlreadyApproved(address)", address(policy));
+      vm.expectRevert(err);
+      kernel.executeAction(Actions.ApprovePolicy, address(policy));
+    }
+
+    function testCorrectness_PolicyPermissions() public {
+      Permissions[] memory permissions = policy.requestPermissions();
+
+      assertEq(Keycode.unwrap(permissions[0].keycode), "MOCKY");
+      assertEq(permissions[0].funcSelector, MOCKY.permissionedCall.selector);
     }
 
     function testCorrectness_CallPublicPolicyFunction() public {
@@ -244,7 +249,6 @@ contract KernelTest is Test {
 
       kernel.executeAction(Actions.TerminatePolicy, address(policy));
       vm.stopPrank();
-
 
       vm.prank(multisig);
       err = abi.encodeWithSignature("Module_PolicyNotAuthorized(address)", address(policy));

@@ -281,14 +281,15 @@ contract KernelTest is Test {
         vm.startPrank(deployer);
 
         err = abi.encodeWithSignature(
-            "Kernel_ModuleDoesNotExistForKeycode(bytes5)",
+            "Kernel_InvalidModuleUpgrade(bytes5)",
             Keycode.wrap("MOCKY")
         );
         vm.expectRevert(err);
         kernel.executeAction(Actions.UpgradeModule, address(upgradedModule));
 
         kernel.executeAction(Actions.InstallModule, address(MOCKY));
-        err = abi.encodeWithSignature("Kernel_ModuleAlreadyInstalled(address)", address(MOCKY));
+
+        err = abi.encodeWithSignature("Kernel_InvalidModuleUpgrade(bytes5)", Keycode.wrap("MOCKY"));
         vm.expectRevert(err);
         kernel.executeAction(Actions.UpgradeModule, address(MOCKY));
 
@@ -302,9 +303,8 @@ contract KernelTest is Test {
 
         assertEq(MOCKY.permissionedState(), 1);
 
+        // Upgrade MOCKY
         vm.prank(deployer);
-
-        // upgrade MOCKY
         kernel.executeAction(Actions.UpgradeModule, address(upgradedModule));
 
         // check state is reset
@@ -368,7 +368,7 @@ contract KernelTest is Test {
         assertEq(Role.unwrap(kernel.getRoleOfAddress(user)), bytes10(0));
         assertEq(kernel.getAddressOfRole(Role.wrap("tester")), address(0));
 
-        err = abi.encodeWithSignature("Policy_OnlyIdentity(bytes10)", Role.wrap("tester"));
+        err = abi.encodeWithSignature("Policy_OnlyRole(bytes32)", Role.wrap("tester"));
         vm.expectRevert(err);
         vm.prank(user);
         policy.callPermissionedFunction();

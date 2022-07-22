@@ -7,7 +7,7 @@ import "src/utils/KernelUtils.sol";
 
 // MODULE
 
-error Module_PolicyNotAuthorized();
+error Module_PolicyNotAuthorized(address policy_);
 
 // POLICY
 
@@ -69,7 +69,7 @@ abstract contract Module {
 
     modifier permissioned() {
         if (!kernel.policyPermissions(Policy(msg.sender), KEYCODE(), msg.sig))
-            revert Module_PolicyNotAuthorized();
+            revert Module_PolicyNotAuthorized(msg.sender);
         _;
     }
 
@@ -77,12 +77,12 @@ abstract contract Module {
 
     /// @notice Specify which version of a module is being implemented.
     /// @dev Minor version change retains interface. Major version upgrade indicates
-    ///      breaking change to the interface.
+    /// @dev breaking change to the interface.
     function VERSION() external pure virtual returns (uint8 major, uint8 minor) {}
 
     /// @notice Initialization function for the module.
     /// @dev This function is called when the module is installed or upgraded by the kernel.
-    /// @dev Used to encompass any upgrade logic.
+    /// @dev Used to encompass any upgrade logic. Must be gated by onlyKernel.
     function INIT() external virtual onlyKernel {}
 }
 
@@ -265,7 +265,7 @@ contract Kernel {
     }
 
     function _terminatePolicy(Policy policy_) internal {
-        if (getPolicyIndex[policy_] != 0) revert Kernel_PolicyNotApproved(address(policy_));
+        if (getPolicyIndex[policy_] == 0) revert Kernel_PolicyNotApproved(address(policy_));
 
         // Revoke permissions
         Permissions[] memory requests = policy_.requestPermissions();

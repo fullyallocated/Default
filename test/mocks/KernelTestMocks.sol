@@ -8,23 +8,14 @@ contract MockPolicy is Policy {
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
-    function configureDependencies()
-        external
-        override
-        returns (Keycode[] memory dependencies)
-    {
+    function configureDependencies() external override returns (Keycode[] memory dependencies) {
         dependencies = new Keycode[](1);
         dependencies[0] = toKeycode("MOCKY");
 
         MOCKY = MockModule(getModuleAddress(dependencies[0]));
     }
 
-    function requestPermissions()
-        external
-        view
-        override
-        returns (Permissions[] memory requests)
-    {
+    function requestPermissions() external view override returns (Permissions[] memory requests) {
         requests = new Permissions[](1);
         requests[0] = Permissions(toKeycode("MOCKY"), MOCKY.permissionedCall.selector);
     }
@@ -33,75 +24,73 @@ contract MockPolicy is Policy {
         MOCKY.publicCall();
     }
 
-    function callPermissionedFunction() onlyRole("tester") external {
+    function callPermissionedFunction() external onlyRole("tester") {
         MOCKY.permissionedCall();
     }
 }
 
 contract MockModule is Module {
-  constructor(Kernel kernel_) Module(kernel_) {}
+    constructor(Kernel kernel_) Module(kernel_) {}
 
-  uint256 public publicState; 
-  uint256 public permissionedState;
+    uint256 public publicState;
+    uint256 public permissionedState;
 
-  function KEYCODE() public pure override returns (Keycode) {
-      return Keycode.wrap("MOCKY");
-  }
+    function KEYCODE() public pure override returns (Keycode) {
+        return Keycode.wrap("MOCKY");
+    }
 
-  function publicCall() public {
-      publicState++;
-  }
+    function publicCall() public {
+        publicState++;
+    }
 
-  function permissionedCall() public permissioned {
-      permissionedState++;
-  }
+    function permissionedCall() public permissioned {
+        permissionedState++;
+    }
 }
 
 contract UpgradedMockModule is Module {
+    MockModule _oldModule;
+    uint256 public publicState;
+    uint256 public permissionedState;
 
-  MockModule _oldModule;
-  uint256 public publicState; 
-  uint256 public permissionedState;
+    constructor(Kernel kernel_, MockModule oldModule_) Module(kernel_) {
+        _oldModule = oldModule_;
+    }
 
-  constructor(Kernel kernel_, MockModule oldModule_) Module(kernel_) {
-    _oldModule = oldModule_;
-  }
+    function KEYCODE() public pure override returns (Keycode) {
+        return toKeycode("MOCKY");
+    }
 
-  function KEYCODE() public pure override returns (Keycode) {
-      return toKeycode("MOCKY");
-  }
+    function INIT() public override onlyKernel {
+        permissionedState = _oldModule.permissionedState();
+    }
 
-  function INIT() public override onlyKernel {
-    permissionedState = _oldModule.permissionedState(); 
-  }
+    function publicCall() public {
+        publicState++;
+    }
 
-  function publicCall() public {
-    publicState++;
-  }
-
-  function permissionedCall() public permissioned {
-    permissionedState++;
-  }
-
+    function permissionedCall() public permissioned {
+        permissionedState++;
+    }
 }
 
 contract InvalidMockModule is Module {
-  constructor(Kernel kernel_) Module(kernel_) {}
+    constructor(Kernel kernel_) Module(kernel_) {}
 
-  uint256 public publicState; 
-  uint256 public permissionedState;
+    uint256 public publicState;
+    uint256 public permissionedState;
 
-  function KEYCODE() public pure override returns (Keycode) {
-      return toKeycode("badkc");
-  }
+    function KEYCODE() public pure override returns (Keycode) {
+        return toKeycode("badkc");
+    }
 
-  function INIT() public override onlyKernel {}
+    function INIT() public override onlyKernel {}
 
-  function publicCall() public {
-    publicState++;
-  }
+    function publicCall() public {
+        publicState++;
+    }
 
-  function permissionedCall() public permissioned {
-    permissionedState++;
-  }
+    function permissionedCall() public permissioned {
+        permissionedState++;
+    }
 }

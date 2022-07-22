@@ -8,7 +8,6 @@ error InvalidRole(Role role_);
 type Keycode is bytes5;
 type Role is bytes32;
 
-
 function toKeycode(bytes5 keycode_) pure returns (Keycode) {
     return Keycode.wrap(keycode_);
 }

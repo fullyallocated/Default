@@ -104,11 +104,7 @@ abstract contract Policy {
         _;
     }
 
-    function configureDependencies()
-        external
-        virtual
-        returns (Keycode[] memory dependencies)
-    {}
+    function configureDependencies() external virtual returns (Keycode[] memory dependencies) {}
 
     function requestPermissions() external view virtual returns (Permissions[] memory requests) {}
 
@@ -242,8 +238,7 @@ contract Kernel {
     }
 
     function _approvePolicy(Policy policy_) internal {
-        if (getPolicyIndex[policy_] != 0)
-            revert Kernel_PolicyAlreadyApproved(address(policy_));
+        if (getPolicyIndex[policy_] != 0) revert Kernel_PolicyAlreadyApproved(address(policy_));
 
         // Grant permissions for policy to access restricted module functions
         Permissions[] memory requests = policy_.requestPermissions();
@@ -261,7 +256,7 @@ contract Kernel {
             Keycode keycode = dependencies[i];
 
             moduleDependents[keycode].push(policy_);
-            getDependentIndex[keycode][policy_] = moduleDependents[keycode].length-1;
+            getDependentIndex[keycode][policy_] = moduleDependents[keycode].length - 1;
 
             unchecked {
                 ++i;
@@ -270,8 +265,7 @@ contract Kernel {
     }
 
     function _terminatePolicy(Policy policy_) internal {
-        if (getPolicyIndex[policy_] != 0)
-            revert Kernel_PolicyNotApproved(address(policy_));
+        if (getPolicyIndex[policy_] != 0) revert Kernel_PolicyNotApproved(address(policy_));
 
         // Revoke permissions
         Permissions[] memory requests = policy_.requestPermissions();
@@ -375,8 +369,7 @@ contract Kernel {
     function registerRole(address address_, Role role_) public onlyAdmin {
         if (fromRole(getRoleOfAddress[address_]) != bytes32(0))
             revert Kernel_AddressAlreadyHasRole(address_);
-        if (getAddressOfRole[role_] != address(0))
-            revert Kernel_RoleAlreadyExistsForAddress(role_);
+        if (getAddressOfRole[role_] != address(0)) revert Kernel_RoleAlreadyExistsForAddress(role_);
 
         ensureValidRole(role_);
 

@@ -10,6 +10,7 @@
   },
   "scripts": {
     "prettier": "prettier --write 'src/**/*.sol'",
+    "prettierTest": "prettier --write 'test/**/*.sol'",
     "prettier:list": "prettier --list-different 'src/**/*.sol'",
     "prettier:check": "prettier --check 'src/**/*.sol'",
     "solhint": "solhint --config ./.solhint.json 'src/**/*.sol' --fix",

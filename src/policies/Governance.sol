@@ -56,11 +56,7 @@ contract Governance is Policy {
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
-    function configureDependencies()
-        external
-        override
-        returns (Keycode[] memory dependencies)
-    {
+    function configureDependencies() external override returns (Keycode[] memory dependencies) {
         INSTR = DefaultInstructions(getModuleAddress(toKeycode("INSTR")));
         VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
 

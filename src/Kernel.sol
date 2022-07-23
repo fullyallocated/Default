@@ -132,14 +132,13 @@ contract Kernel {
 
     // Length of this array is number of approved policies
     Policy[] public activePolicies;
-    // Reverse lookup for policy index. Offset by 1 to be able to use 0 as a null value
+    // Reverse lookup for policy index. NOTE: Offset by 1 to be able to use 0 as a null value
     mapping(Policy => uint256) public getPolicyIndex;
 
     // Module <> Policy Permissions
     mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
 
     // Policy Roles
-    //mapping(Role => bool) public isActiveRole; // TODO
     mapping(address => Role) public getRoleOfAddress;
     mapping(Role => address) public getAddressOfRole;
 

@@ -57,12 +57,13 @@ contract Governance is Policy {
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureDependencies() external override returns (Keycode[] memory dependencies) {
-        INSTR = DefaultInstructions(getModuleAddress(toKeycode("INSTR")));
-        VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
-
         dependencies = new Keycode[](2);
+
         dependencies[0] = toKeycode("INSTR");
+        INSTR = DefaultInstructions(getModuleAddress(toKeycode("INSTR")));
+
         dependencies[1] = toKeycode("VOTES");
+        VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
     }
 
     function requestPermissions()
@@ -72,10 +73,11 @@ contract Governance is Policy {
         onlyKernel
         returns (Permissions[] memory requests)
     {
-        requests = new Permissions[](3);
+        requests = new Permissions[](4);
         requests[0] = Permissions(toKeycode("INSTR"), INSTR.store.selector);
         requests[1] = Permissions(toKeycode("VOTES"), VOTES.mintTo.selector);
         requests[2] = Permissions(toKeycode("VOTES"), VOTES.burnFrom.selector);
+        requests[3] = Permissions(toKeycode("VOTES"), VOTES.transferFrom.selector);
     }
 
     /////////////////////////////////////////////////////////////////////////////////

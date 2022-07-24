@@ -12,11 +12,12 @@ contract DeployGovernance is Script {
         vm.startBroadcast();
 
         kernel = new Kernel();
-        INSTR = new DefaultInstructions();
-        INSTR = new DefaultInstructions();
-        VOTES = new DefaultVotes();
+        INSTR = new DefaultInstructions(kernel);
+        VOTES = new DefaultVotes(kernel);
+        Governance = new Governance(kernel);
+        VoteIssuer = new VoteIssuer(kernel);
 
-        vm.stopPrank();
+        
 
         vm.stopBroadcast();
     }

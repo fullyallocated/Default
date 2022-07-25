@@ -36,7 +36,6 @@ contract KernelTest is Test {
 
     function testCorrectness_InitializeKernel() public {
         Keycode keycode = Keycode.wrap(0);
-        Role role = Role.wrap(0);
 
         assertEq(kernel.admin(), deployer);
         assertEq(kernel.executor(), deployer);

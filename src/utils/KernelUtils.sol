@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.13;
 
+import {Keycode, Role} from "../Kernel.sol";
+
 error TargetNotAContract(address target_);
 error InvalidKeycode(Keycode keycode_);
 error InvalidRole(Role role_);
 
-type Keycode is bytes5;
-type Role is bytes32;
+//type Keycode is bytes5;
+//type Role is bytes32;
 
 function toKeycode(bytes5 keycode_) pure returns (Keycode) {
     return Keycode.wrap(keycode_);

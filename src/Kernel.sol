@@ -51,6 +51,9 @@ struct Permissions {
     bytes4 funcSelector;
 }
 
+type Keycode is bytes5;
+type Role is bytes32;
+
 // ######################## ~ MODULE ABSTRACT ~ ########################
 
 abstract contract Module {
@@ -88,6 +91,7 @@ abstract contract Module {
 
 abstract contract Policy {
     Kernel public kernel;
+    bool public approved;
 
     constructor(Kernel kernel_) {
         kernel = kernel_;
@@ -134,6 +138,7 @@ contract Kernel {
     Policy[] public activePolicies;
     // Reverse lookup for policy index. NOTE: Offset by 1 to be able to use 0 as a null value
     mapping(Policy => uint256) public getPolicyIndex;
+    mapping(Policy => bool) public isPolicyActive;
 
     // Module <> Policy Permissions
     mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
@@ -245,7 +250,7 @@ contract Kernel {
 
         // Add policy to list of active policies
         activePolicies.push(policy_);
-        getPolicyIndex[policy_] = activePolicies.length;
+        getPolicyIndex[policy_] = activePolicies.length; // Offset by 1
 
         // Record module dependencies
         Keycode[] memory dependencies = policy_.configureDependencies();

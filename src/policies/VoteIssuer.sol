@@ -11,10 +11,15 @@ contract VoteIssuer is Policy {
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
-    function configureDependencies() external override returns (Keycode[] memory dependencies) {
+    function configureDependencies() 
+        external 
+        override 
+        onlyKernel
+        returns (Keycode[] memory dependencies) 
+    {
         dependencies = new Keycode[](1);
         
-        dependencies[1] = toKeycode("VOTES");
+        dependencies[0] = toKeycode("VOTES");
         VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
     }
 
@@ -33,11 +38,11 @@ contract VoteIssuer is Policy {
     //////
 
 
-    function mint(address wallet_, uint256 amt_) external {
+    function mint(address wallet_, uint256 amt_) external onlyRole("voteissuer") {
         VOTES.mintTo(wallet_, amt_);
     }
 
-    function burn(address wallet_, uint256 amt_) external {
+    function burn(address wallet_, uint256 amt_) external onlyRole("voteissuer") {
         VOTES.burnFrom(wallet_, amt_);
     }
 

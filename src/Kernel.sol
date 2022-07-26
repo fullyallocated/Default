@@ -104,9 +104,9 @@ abstract contract Policy {
         _;
     }
 
-    function configureDependencies() external virtual returns (Keycode[] memory dependencies) {}
+    function configureDependencies() external virtual onlyKernel returns (Keycode[] memory dependencies) {}
 
-    function requestPermissions() external view virtual returns (Permissions[] memory requests) {}
+    function requestPermissions() external view virtual onlyKernel returns (Permissions[] memory requests) {}
 
     function getModuleAddress(Keycode keycode_) internal view returns (address) {
         address moduleForKeycode = address(kernel.getModuleForKeycode(keycode_));

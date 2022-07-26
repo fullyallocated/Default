@@ -16,17 +16,10 @@ contract DefaultInstructions is Module {
     //                         Kernel Module Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-    Kernel.Role public constant GOVERNOR = Kernel.Role.wrap("INSTR_Governor");
-
     constructor(Kernel kernel_) Module(kernel_) {}
 
-    function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.Keycode.wrap("INSTR");
-    }
-
-    function ROLES() public pure override returns (Kernel.Role[] memory roles) {
-        roles = new Kernel.Role[](1);
-        roles[0] = GOVERNOR;
+    function KEYCODE() public pure override returns (Keycode) {
+        return Keycode.wrap("INSTR");
     }
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -34,22 +27,6 @@ contract DefaultInstructions is Module {
     /////////////////////////////////////////////////////////////////////////////////
 
     event InstructionsStored(uint256 instructionsId);
-
-    /* Imported from Kernel, just here for reference:
-
-    enum Actions {
-        InstallModule,
-        UpgradeModule,
-        ApprovePolicy,
-        TerminatePolicy,
-        ChangeExecutor
-    }
-
-    struct Instruction {
-        Actions action;
-        address target;
-    }
-    */
 
     uint256 public totalInstructions;
     mapping(uint256 => Instruction[]) public storedInstructions;
@@ -59,19 +36,11 @@ contract DefaultInstructions is Module {
     /////////////////////////////////////////////////////////////////////////////////
 
     // view function for retrieving a list of instructions in an outside contract
-    function getInstructions(uint256 instructionsId_)
-        public
-        view
-        returns (Instruction[] memory)
-    {
+    function getInstructions(uint256 instructionsId_) public view returns (Instruction[] memory) {
         return storedInstructions[instructionsId_];
     }
 
-    function store(Instruction[] calldata instructions_)
-        external
-        onlyRole(GOVERNOR)
-        returns (uint256)
-    {
+    function store(Instruction[] calldata instructions_) external permissioned returns (uint256) {
         uint256 length = instructions_.length;
         uint256 instructionsId = ++totalInstructions;
 
@@ -98,9 +67,7 @@ contract DefaultInstructions is Module {
             ) {
                 Module module = Module(instruction.target);
                 _ensureValidKeycode(module.KEYCODE());
-            } else if (
-                instruction.action == Actions.ChangeExecutor && i != length - 1
-            ) {
+            } else if (instruction.action == Actions.ChangeExecutor && i != length - 1) {
                 // throw an error if ChangeExecutor exists and is not the last Action in the instruction llist
                 // this exists because if ChangeExecutor is not the last item in the list of instructions
                 // the Kernel will not recognize any of the following instructions as valid, since the policy
@@ -111,7 +78,9 @@ contract DefaultInstructions is Module {
             }
 
             instructions.push(instructions_[i]);
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
 
         emit InstructionsStored(instructionsId);
@@ -129,15 +98,17 @@ contract DefaultInstructions is Module {
         if (size == 0) revert INSTR_InvalidTargetNotAContract();
     }
 
-    function _ensureValidKeycode(Kernel.Keycode keycode_) internal pure {
-        bytes5 unwrapped = Kernel.Keycode.unwrap(keycode_);
+    function _ensureValidKeycode(Keycode keycode_) internal pure {
+        bytes5 unwrapped = Keycode.unwrap(keycode_);
 
         for (uint256 i = 0; i < 5; ) {
             bytes1 char = unwrapped[i];
 
             if (char < 0x41 || char > 0x5A) revert INSTR_InvalidModuleKeycode(); // A-Z only"
 
-            unchecked { i++; }
+            unchecked {
+                i++;
+            }
         }
     }
 }

@@ -56,17 +56,12 @@ contract Governance is Policy {
 
     constructor(Kernel kernel_) Policy(kernel_) {}
 
-    function configureDependencies() 
-        external 
-        override 
-        onlyKernel
-        returns (Keycode[] memory dependencies) 
-    {
+    function configureDependencies() external override returns (Keycode[] memory dependencies) {
         dependencies = new Keycode[](2);
-
+        
         dependencies[0] = toKeycode("INSTR");
         INSTR = DefaultInstructions(getModuleAddress(toKeycode("INSTR")));
-
+        
         dependencies[1] = toKeycode("VOTES");
         VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
     }
@@ -101,7 +96,8 @@ contract Governance is Policy {
     mapping(uint256 => ProposalMetadata) public getProposalMetadata;
 
     mapping(uint256 => uint256) public totalEndorsementsForProposal;
-    mapping(uint256 => mapping(address => uint256)) public userEndorsementsForProposal;
+    mapping(uint256 => mapping(address => uint256))
+        public userEndorsementsForProposal;
     mapping(uint256 => bool) public proposalHasBeenActivated;
 
     mapping(uint256 => uint256) public yesVotesForProposal;

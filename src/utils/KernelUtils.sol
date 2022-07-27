@@ -7,9 +7,6 @@ error TargetNotAContract(address target_);
 error InvalidKeycode(Keycode keycode_);
 error InvalidRole(Role role_);
 
-//type Keycode is bytes5;
-//type Role is bytes32;
-
 function toKeycode(bytes5 keycode_) pure returns (Keycode) {
     return Keycode.wrap(keycode_);
 }
@@ -28,7 +25,7 @@ function fromRole(Role role_) pure returns (bytes32) {
 
 function ensureContract(address target_) view {
     uint256 size;
-    assembly ("memory-safe") {
+    assembly("memory-safe") {
         size := extcodesize(target_)
     }
     if (size == 0) revert TargetNotAContract(target_);

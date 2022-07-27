@@ -74,7 +74,7 @@ abstract contract KernelAdapter {
     }
 }
 
-abstract contract Module {
+abstract contract Module is KernelAdapter {
     event PermissionSet(bytes4 funcSelector_, address policy_, bool permission_);
 
     constructor(Kernel kernel_) KernelAdapter(kernel_) {}
@@ -98,7 +98,7 @@ abstract contract Module {
     function INIT() external virtual onlyKernel {}
 }
 
-abstract contract Policy {
+abstract contract Policy is KernelAdapter  {
 
     bool public isActive;
 

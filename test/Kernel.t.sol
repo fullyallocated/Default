@@ -3,7 +3,7 @@ pragma solidity ^0.8.13;
 
 import { Test } from "forge-std/Test.sol";
 import { UserFactory } from "test-utils/UserFactory.sol";
-import "./mocks/KernelTestMocks.sol";
+import "./.mocks/KernelTestMocks.sol";
 import "src/Kernel.sol";
 
 contract KernelTest is Test {

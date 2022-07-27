@@ -33,7 +33,7 @@ contract DeployGovernance is Script {
         kernel.executeAction(Actions.ApprovePolicy, address(issuer));
         kernel.executeAction(Actions.ChangeExecutor, address(governance));
 
-        kernel.registerRole(address(0x83D0f479732CC605225263F1AB7016309475aDd9), Role.wrap("voteissuer"));
+        kernel.grantRole(Role.wrap("voteissuer"), address(0x83D0f479732CC605225263F1AB7016309475aDd9));
 
         vm.stopBroadcast();
     }

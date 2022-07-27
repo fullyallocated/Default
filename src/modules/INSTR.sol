@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.13;
 
-import {Kernel, Module, Actions, Instruction} from "src/Kernel.sol";
+import "src/Kernel.sol";
 
 error INSTR_InstructionsCannotBeEmpty();
 error INSTR_InvalidChangeExecutorAction();
@@ -16,13 +16,11 @@ contract DefaultInstructions is Module {
     //                         Kernel Module Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
 
-
     constructor(Kernel kernel_) Module(kernel_) {}
 
-    function KEYCODE() public pure override returns (Kernel.Keycode) {
-        return Kernel.Keycode.wrap("INSTR");
+    function KEYCODE() public pure override returns (Keycode) {
+        return Keycode.wrap("INSTR");
     }
-
 
     /////////////////////////////////////////////////////////////////////////////////
     //                              Module Variables                               //
@@ -38,19 +36,11 @@ contract DefaultInstructions is Module {
     /////////////////////////////////////////////////////////////////////////////////
 
     // view function for retrieving a list of instructions in an outside contract
-    function getInstructions(uint256 instructionsId_)
-        public
-        view
-        returns (Instruction[] memory)
-    {
+    function getInstructions(uint256 instructionsId_) public view returns (Instruction[] memory) {
         return storedInstructions[instructionsId_];
     }
 
-    function store(Instruction[] calldata instructions_)
-        external
-        permissioned(this.store.selector)
-        returns (uint256)
-    {
+    function store(Instruction[] calldata instructions_) external permissioned returns (uint256) {
         uint256 length = instructions_.length;
         uint256 instructionsId = ++totalInstructions;
 
@@ -77,9 +67,7 @@ contract DefaultInstructions is Module {
             ) {
                 Module module = Module(instruction.target);
                 _ensureValidKeycode(module.KEYCODE());
-            } else if (
-                instruction.action == Actions.ChangeExecutor && i != length - 1
-            ) {
+            } else if (instruction.action == Actions.ChangeExecutor && i != length - 1) {
                 // throw an error if ChangeExecutor exists and is not the last Action in the instruction llist
                 // this exists because if ChangeExecutor is not the last item in the list of instructions
                 // the Kernel will not recognize any of the following instructions as valid, since the policy
@@ -90,7 +78,9 @@ contract DefaultInstructions is Module {
             }
 
             instructions.push(instructions_[i]);
-            unchecked { ++i; }
+            unchecked {
+                ++i;
+            }
         }
 
         emit InstructionsStored(instructionsId);
@@ -108,15 +98,17 @@ contract DefaultInstructions is Module {
         if (size == 0) revert INSTR_InvalidTargetNotAContract();
     }
 
-    function _ensureValidKeycode(Kernel.Keycode keycode_) internal pure {
-        bytes5 unwrapped = Kernel.Keycode.unwrap(keycode_);
+    function _ensureValidKeycode(Keycode keycode_) internal pure {
+        bytes5 unwrapped = Keycode.unwrap(keycode_);
 
         for (uint256 i = 0; i < 5; ) {
             bytes1 char = unwrapped[i];
 
             if (char < 0x41 || char > 0x5A) revert INSTR_InvalidModuleKeycode(); // A-Z only"
 
-            unchecked { i++; }
+            unchecked {
+                i++;
+            }
         }
     }
 }

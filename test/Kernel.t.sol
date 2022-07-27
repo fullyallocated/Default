@@ -115,6 +115,8 @@ contract KernelTest is Test {
         vm.expectRevert(err);
         kernel.revokeRole(testerRole ,deployer);
 
+        // TODO test role not existing
+
         vm.startPrank(deployer);
         kernel.grantRole(testerRole, multisig);
         assertTrue(kernel.hasRole(multisig, testerRole));
@@ -122,9 +124,10 @@ contract KernelTest is Test {
         kernel.revokeRole(testerRole, multisig);
         assertFalse(kernel.hasRole(multisig, testerRole));
 
-        err = abi.encodeWithSignature(
-            "Kernel_RoleDoesNotExistForAddress(address)",
-            address(multisig)
+        err = abi.encodeWithSelector(
+            Kernel_AddressDoesNotHaveRole.selector,
+            multisig,
+            testerRole
         );
         vm.expectRevert(err);
         kernel.revokeRole(testerRole, multisig);

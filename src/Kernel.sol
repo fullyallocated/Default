@@ -104,10 +104,9 @@ abstract contract Policy {
     }
 
     modifier onlyRole(bytes32 role_) {
-        // TODO get identity of address
-        // TODO check if identity has role_
-        //if (fromRole(kernel.getRoleOfAddress(msg.sender)) != role_)
-            revert Policy_OnlyRole(Role.wrap(role_));
+        Role role = toRole(role_);
+        if(!kernel.hasRole(msg.sender, role))
+            revert Policy_OnlyRole(role);
         _;
     }
 

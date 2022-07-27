@@ -23,9 +23,9 @@ error Kernel_ModuleAlreadyInstalled(Keycode module_);
 error Kernel_InvalidModuleUpgrade(Keycode module_);
 error Kernel_PolicyAlreadyApproved(address policy_);
 error Kernel_PolicyNotApproved(address policy_);
-error Kernel_AddressAlreadyHasRole(address address_);
-error Kernel_RoleAlreadyExistsForAddress(Role role_);
-error Kernel_RoleDoesNotExistForAddress(address address_);
+error Kernel_AddressAlreadyHasRole(address addr_, Role role_);
+error Kernel_AddressDoesNotHaveRole(address addr_, Role role_);
+error Kernel_RoleDoesNotExist(Role role_);
 error Kernel_InvalidTargetNotAContract(address target_);
 error Kernel_InvalidKeycode(Keycode keycode_);
 error Kernel_InvalidRole(Role role_);
@@ -51,6 +51,9 @@ struct Permissions {
     bytes4 funcSelector;
 }
 
+type Keycode is bytes5;
+type Role is bytes32;
+
 // ######################## ~ MODULE ABSTRACT ~ ########################
 
 abstract contract Module {
@@ -68,7 +71,7 @@ abstract contract Module {
     }
 
     modifier permissioned() {
-        if (!kernel.policyPermissions(Policy(msg.sender), KEYCODE(), msg.sig))
+        if (!kernel.modulePermissions(KEYCODE(), Policy(msg.sender), msg.sig))
             revert Module_PolicyNotAuthorized(msg.sender);
         _;
     }
@@ -87,7 +90,9 @@ abstract contract Module {
 }
 
 abstract contract Policy {
+
     Kernel public kernel;
+    bool public isActive;
 
     constructor(Kernel kernel_) {
         kernel = kernel_;
@@ -99,8 +104,9 @@ abstract contract Policy {
     }
 
     modifier onlyRole(bytes32 role_) {
-        if (fromRole(kernel.getRoleOfAddress(msg.sender)) != role_)
-            revert Policy_OnlyRole(Role.wrap(role_));
+        Role role = toRole(role_);
+        if(!kernel.hasRole(msg.sender, role))
+            revert Policy_OnlyRole(role);
         _;
     }
 
@@ -110,10 +116,13 @@ abstract contract Policy {
 
     function getModuleAddress(Keycode keycode_) internal view returns (address) {
         address moduleForKeycode = address(kernel.getModuleForKeycode(keycode_));
-
         if (moduleForKeycode == address(0)) revert Policy_ModuleDoesNotExist(keycode_);
-
         return moduleForKeycode;
+    }
+
+    /// @notice Function to let kernel grant or revoke active status
+    function setActiveStatus(bool activate_) external onlyKernel {
+        isActive = activate_;
     }
 }
 
@@ -127,32 +136,33 @@ contract Kernel {
     // Module Management
     mapping(Keycode => Module) public getModuleForKeycode; // get contract for module keycode
     mapping(Module => Keycode) public getKeycodeForModule; // get module keycode for contract
+    
+    // Module dependents data. Manages module dependencies for policies
     mapping(Keycode => Policy[]) public moduleDependents;
     mapping(Keycode => mapping(Policy => uint256)) public getDependentIndex;
 
-    // Length of this array is number of approved policies
+    // Module <> Policy Permissions. Policy -> Keycode -> Function Selector -> Permission
+    mapping(Keycode => mapping(Policy => mapping(bytes4 => bool))) public modulePermissions; // for policy addr, check if they have permission to call the function int he module
+
+    // List of all active policies
     Policy[] public activePolicies;
-    // Reverse lookup for policy index. NOTE: Offset by 1 to be able to use 0 as a null value
+    // Reverse lookup for policy index
     mapping(Policy => uint256) public getPolicyIndex;
 
-    // Module <> Policy Permissions
-    mapping(Policy => mapping(Keycode => mapping(bytes4 => bool))) public policyPermissions; // for policy addr, check if they have permission to call the function int he module
-
-    // Policy Roles
-    mapping(address => Role) public getRoleOfAddress;
-    mapping(Role => address) public getAddressOfRole;
+    // Policy roles data
+    mapping(address => mapping(Role => bool)) public hasRole;
+    mapping(Role => bool) public isRole;
 
     // ######################## ~ EVENTS ~ ########################
 
     event PermissionsUpdated(
-        Policy indexed policy_,
         Keycode indexed keycode_,
+        Policy indexed policy_,
         bytes4 funcSelector_,
         bool indexed granted_
     );
-
-    event RolesUpdated(Role indexed role_, address indexed addr_, bool indexed granted_);
-
+    event RoleGranted(Role indexed role_, address indexed addr_);
+    event RoleRevoked(Role indexed role_, address indexed addr_);
     event ActionExecuted(Actions indexed action_, address indexed target_);
 
     // ######################## ~ BODY ~ ########################
@@ -237,7 +247,7 @@ contract Kernel {
     }
 
     function _approvePolicy(Policy policy_) internal {
-        if (getPolicyIndex[policy_] != 0) revert Kernel_PolicyAlreadyApproved(address(policy_));
+        if (policy_.isActive()) revert Kernel_PolicyAlreadyApproved(address(policy_));
 
         // Grant permissions for policy to access restricted module functions
         Permissions[] memory requests = policy_.requestPermissions();
@@ -245,7 +255,7 @@ contract Kernel {
 
         // Add policy to list of active policies
         activePolicies.push(policy_);
-        getPolicyIndex[policy_] = activePolicies.length;
+        getPolicyIndex[policy_] = activePolicies.length - 1;
 
         // Record module dependencies
         Keycode[] memory dependencies = policy_.configureDependencies();
@@ -261,26 +271,32 @@ contract Kernel {
                 ++i;
             }
         }
+
+        // Set policy status to active
+        policy_.setActiveStatus(true);
     }
 
     function _terminatePolicy(Policy policy_) internal {
-        if (getPolicyIndex[policy_] == 0) revert Kernel_PolicyNotApproved(address(policy_));
+        if (!policy_.isActive()) revert Kernel_PolicyNotApproved(address(policy_));
 
         // Revoke permissions
         Permissions[] memory requests = policy_.requestPermissions();
         _setPolicyPermissions(policy_, requests, false);
 
         // Remove policy from all policy data structures
-        uint256 idx = getPolicyIndex[policy_] - 1;
+        uint256 idx = getPolicyIndex[policy_];
         Policy lastPolicy = activePolicies[activePolicies.length - 1];
 
         activePolicies[idx] = lastPolicy;
         activePolicies.pop();
-        getPolicyIndex[lastPolicy] = idx + 1;
+        getPolicyIndex[lastPolicy] = idx;
         delete getPolicyIndex[policy_];
 
         // Remove policy from module dependents
         _pruneFromDependents(policy_);
+
+        // Set policy status to inactive
+        policy_.setActiveStatus(false);
     }
 
     function _reconfigurePolicies(Keycode keycode_) internal {
@@ -304,41 +320,15 @@ contract Kernel {
         uint256 reqLength = requests_.length;
         for (uint256 i = 0; i < reqLength; ) {
             Permissions memory request = requests_[i];
-            policyPermissions[policy_][request.keycode][request.funcSelector] = grant_;
+            modulePermissions[request.keycode][policy_][request.funcSelector] = grant_;
 
-            emit PermissionsUpdated(policy_, request.keycode, request.funcSelector, grant_);
+            emit PermissionsUpdated(request.keycode, policy_, request.funcSelector, grant_);
 
             unchecked {
                 ++i;
             }
         }
     }
-
-    /*
-    // TODO Naiive implementation. O(n*m). Optimize.
-    function _pruneFromDependents(Policy policy_) internal {
-        Keycode[] memory dependencies = policy_.configureDependencies();
-        uint256 depcLength = dependencies.length;
-
-        for (uint256 i; i < depcLength; ) {
-            Policy[] storage dependents = moduleDependents[dependencies[i]];
-            uint256 deptLength = dependents.length;
-
-            for (uint256 j; j < deptLength; ) {
-                if (dependents[j] == policy_) {
-                    // Swap with last element if its not last element
-                    if(j != deptLength - 1) {
-                        dependents[j] = dependents[deptLength - 1];
-                    }
-                    dependents.pop();
-                    break;
-                }
-                unchecked { ++j; }
-            }
-            unchecked { ++i; }
-        }
-    }
-    */
 
     function _pruneFromDependents(Policy policy_) internal {
         Keycode[] memory dependencies = policy_.configureDependencies();
@@ -365,23 +355,25 @@ contract Kernel {
         }
     }
 
-    function registerRole(address address_, Role role_) public onlyAdmin {
-        if (fromRole(getRoleOfAddress[address_]) != bytes32(0))
-            revert Kernel_AddressAlreadyHasRole(address_);
-        if (getAddressOfRole[role_] != address(0)) revert Kernel_RoleAlreadyExistsForAddress(role_);
+    // TODO
+    function grantRole(Role role_, address addr_) public onlyAdmin {
+        if (hasRole[addr_][role_]) revert Kernel_AddressAlreadyHasRole(addr_, role_);
 
         ensureValidRole(role_);
+        if (!isRole[role_]) isRole[role_] = true;
 
-        getRoleOfAddress[address_] = role_;
-        getAddressOfRole[role_] = address_;
+        hasRole[addr_][role_] = true;
+
+        emit RoleGranted(role_, addr_);
     }
 
-    function revokeRole(address address_) public onlyAdmin {
-        Role roleOfAddress = getRoleOfAddress[address_];
-        if (getAddressOfRole[roleOfAddress] == address(0))
-            revert Kernel_RoleDoesNotExistForAddress(address_);
+    // TODO
+    function revokeRole(Role role_, address addr_) public onlyAdmin {
+        if (!isRole[role_]) revert Kernel_RoleDoesNotExist(role_);
+        if (!hasRole[addr_][role_]) revert Kernel_AddressDoesNotHaveRole(addr_, role_);
 
-        getAddressOfRole[roleOfAddress] = address(0);
-        getRoleOfAddress[address_] = Role.wrap(bytes32(0));
+        hasRole[addr_][role_] = false;
+
+        emit RoleRevoked(role_, addr_);
     }
 }

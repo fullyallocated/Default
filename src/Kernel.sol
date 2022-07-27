@@ -26,7 +26,6 @@ error Kernel_ModuleAlreadyInstalled(Keycode module_);
 error Kernel_InvalidModuleUpgrade(Keycode module_);
 error Kernel_PolicyAlreadyApproved(address policy_);
 error Kernel_PolicyNotApproved(address policy_);
-error Kernel_InvalidMigration();
 error Kernel_AddressAlreadyHasRole(address addr_, Role role_);
 error Kernel_AddressDoesNotHaveRole(address addr_, Role role_);
 error Kernel_RoleDoesNotExist(Role role_);
@@ -38,6 +37,7 @@ enum Actions {
     UpgradeModule,
     ApprovePolicy,
     TerminatePolicy,
+    MigrateKernel,
     ChangeExecutor,
     ChangeAdmin
 }
@@ -69,8 +69,8 @@ abstract contract KernelAdapter {
         _;
     }
 
-    function changeKernel(address newKernel_) external onlyKernel {
-        kernel = Kernel(newKernel_);
+    function changeKernel(Kernel newKernel_) external onlyKernel {
+        kernel = newKernel_;
     }
 }
 
@@ -148,7 +148,6 @@ contract Kernel {
 
     // List of all active policies
     Policy[] public activePolicies;
-    // Lookup for policy index
     mapping(Policy => uint256) public getPolicyIndex;
 
     // Policy roles data
@@ -194,21 +193,20 @@ contract Kernel {
         if (action_ == Actions.InstallModule) {
             ensureContract(target_);
             ensureValidKeycode(Module(target_).KEYCODE());
-
             _installModule(Module(target_));
         } else if (action_ == Actions.UpgradeModule) {
             ensureContract(target_);
             ensureValidKeycode(Module(target_).KEYCODE());
-
             _upgradeModule(Module(target_));
         } else if (action_ == Actions.ApprovePolicy) {
             ensureContract(target_);
-
             _approvePolicy(Policy(target_));
         } else if (action_ == Actions.TerminatePolicy) {
             ensureContract(target_);
-
             _terminatePolicy(Policy(target_));
+        } else if (action_ == Actions.MigrateKernel) {
+            ensureContract(target_);
+            _migrateKernel(Kernel(target_));
         } else if (action_ == Actions.ChangeExecutor) {
             executor = target_;
         } else if (action_ == Actions.ChangeAdmin) {
@@ -302,11 +300,10 @@ contract Kernel {
         policy_.setActiveStatus(false);
     }
 
-    // WARNING: THIS WILL BRICK THE KERNEL. All functionality will move to the new kernel.
+    // WARNING: ACTION WILL BRICK THIS KERNEL. All functionality will move to the new kernel
     // New kernel must add in all of the modules and policies via executeAction
-    function _migrateKernel(address newKernel_) internal {
-        if(newKernel_ == address(0)) revert Kernel_InvalidMigration();
-
+    // NOTE: Data does not get cleared from this kernel
+    function _migrateKernel(Kernel newKernel_) internal {
         uint256 keycodeLen = allKeycodes.length;
         for (uint256 i; i < keycodeLen; ) {
             Module module = Module(getModuleForKeycode[allKeycodes[i]]);

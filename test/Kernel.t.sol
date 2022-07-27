@@ -3,6 +3,7 @@ pragma solidity ^0.8.13;
 
 import { Test } from "forge-std/Test.sol";
 import { UserFactory } from "test-utils/UserFactory.sol";
+
 import "./mocks/KernelTestMocks.sol";
 import "src/Kernel.sol";
 
@@ -178,7 +179,7 @@ contract KernelTest is Test {
         vm.expectRevert(err);
         kernel.executeAction(Actions.ApprovePolicy, address(policy));
 
-        _approveTestPolicy();
+        _initModuleAndPolicy();
 
         assertEq(
             kernel.modulePermissions(testKeycode, policy, MOCKY.permissionedCall.selector),
@@ -205,7 +206,7 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_CallPublicPolicyFunction() public {
-        _approveTestPolicy();
+        _initModuleAndPolicy();
 
         vm.prank(deployer);
         policy.callPublicFunction();
@@ -214,7 +215,7 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_CallPermissionedPolicyFunction() public {
-        _approveTestPolicy();
+        _initModuleAndPolicy();
 
         // Test role-based auth for policy calls
         Role testerRole = Role.wrap("tester");
@@ -375,19 +376,17 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_MigrateKernel() public {
-        // Add in dummy module and policy
-        vm.startPrank(deployer);
-        kernel.executeAction(Actions.InstallModule, address(MOCKY));
-        kernel.executeAction(Actions.ApprovePolicy, address(policy));
-        vm.stopPrank();
+        _initModuleAndPolicy();
 
-        assertEq(kernel.allKeycodes(0), MOCKY.KEYCODE());
-        assertEq(kernel.activePolicies(0), address(policy));
+        assertEq(address(kernel.getModuleForKeycode(kernel.allKeycodes(0))), address(MOCKY));
+        assertEq(address(kernel.activePolicies(0)), address(policy));
 
         // Create new kernel and migrate to it
+        Kernel newKernel = new Kernel();
+        address newKernelAddr = address(newKernel);
     }
 
-    function _approveTestPolicy() internal {
+    function _initModuleAndPolicy() internal {
         vm.startPrank(deployer);
         kernel.executeAction(Actions.InstallModule, address(MOCKY));
         kernel.executeAction(Actions.ApprovePolicy, address(policy));

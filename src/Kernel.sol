@@ -135,7 +135,7 @@ contract Kernel {
     // ######################## ~ DEPENDENCY MANAGEMENT ~ ########################
 
     // Module Management
-    Keycode[] allKeycodes;
+    Keycode[] public allKeycodes;
     mapping(Keycode => Module) public getModuleForKeycode; // get contract for module keycode
     mapping(Module => Keycode) public getKeycodeForModule; // get module keycode for contract
     
@@ -148,7 +148,7 @@ contract Kernel {
 
     // List of all active policies
     Policy[] public activePolicies;
-    // Reverse lookup for policy index
+    // Lookup for policy index
     mapping(Policy => uint256) public getPolicyIndex;
 
     // Policy roles data
@@ -381,7 +381,6 @@ contract Kernel {
         }
     }
 
-    // TODO
     function grantRole(Role role_, address addr_) public onlyAdmin {
         if (hasRole[addr_][role_]) revert Kernel_AddressAlreadyHasRole(addr_, role_);
 
@@ -393,7 +392,6 @@ contract Kernel {
         emit RoleGranted(role_, addr_);
     }
 
-    // TODO
     function revokeRole(Role role_, address addr_) public onlyAdmin {
         if (!isRole[role_]) revert Kernel_RoleDoesNotExist(role_);
         if (!hasRole[addr_][role_]) revert Kernel_AddressDoesNotHaveRole(addr_, role_);

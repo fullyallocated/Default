@@ -169,13 +169,6 @@ contract KernelTest is Test {
         vm.stopPrank();
     }
 
-    // TODO Move to bottom or separate file
-    function _approveTestPolicy() internal {
-        vm.startPrank(deployer);
-        kernel.executeAction(Actions.InstallModule, address(MOCKY));
-        kernel.executeAction(Actions.ApprovePolicy, address(policy));
-        vm.stopPrank();
-    }
 
     function testCorrectness_ApprovePolicy() public {
         Keycode testKeycode = Keycode.wrap("MOCKY");
@@ -379,5 +372,25 @@ contract KernelTest is Test {
         vm.expectRevert(err);
         vm.prank(user);
         policy.callPermissionedFunction();
+    }
+
+    function testCorrectness_MigrateKernel() public {
+        // Add in dummy module and policy
+        vm.startPrank(deployer);
+        kernel.executeAction(Actions.InstallModule, address(MOCKY));
+        kernel.executeAction(Actions.ApprovePolicy, address(policy));
+        vm.stopPrank();
+
+        assertEq(kernel.allKeycodes(0), MOCKY.KEYCODE());
+        assertEq(kernel.activePolicies(0), address(policy));
+
+        // Create new kernel and migrate to it
+    }
+
+    function _approveTestPolicy() internal {
+        vm.startPrank(deployer);
+        kernel.executeAction(Actions.InstallModule, address(MOCKY));
+        kernel.executeAction(Actions.ApprovePolicy, address(policy));
+        vm.stopPrank();
     }
 }

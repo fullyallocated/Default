@@ -160,7 +160,7 @@ contract Kernel {
         Keycode indexed keycode_,
         Policy indexed policy_,
         bytes4 funcSelector_,
-        bool indexed granted_
+        bool granted_
     );
     event RoleGranted(Role indexed role_, address indexed addr_);
     event RoleRevoked(Role indexed role_, address indexed addr_);
@@ -315,7 +315,11 @@ contract Kernel {
 
         uint256 policiesLen = activePolicies.length;
         for (uint256 j; j < policiesLen; ) {
-            activePolicies[j].changeKernel(newKernel_);
+            Policy policy = activePolicies[j];
+
+            // Deactivate before changing kernel
+            policy.setActiveStatus(false);
+            policy.changeKernel(newKernel_);
             unchecked {
                 ++j;
             }

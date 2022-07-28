@@ -381,9 +381,22 @@ contract KernelTest is Test {
         assertEq(address(kernel.getModuleForKeycode(kernel.allKeycodes(0))), address(MOCKY));
         assertEq(address(kernel.activePolicies(0)), address(policy));
 
+        vm.startPrank(deployer);
+
         // Create new kernel and migrate to it
         Kernel newKernel = new Kernel();
-        address newKernelAddr = address(newKernel);
+
+        kernel.executeAction(Actions.MigrateKernel, address(newKernel));
+
+        assertEq(address(MOCKY.kernel()), address(newKernel));
+        assertEq(address(policy.kernel()), address(newKernel));
+
+        // Install module and approve policy
+        newKernel.executeAction(Actions.InstallModule, address(MOCKY));
+        newKernel.executeAction(Actions.ApprovePolicy, address(policy));
+
+        assertEq(address(newKernel.getModuleForKeycode(newKernel.allKeycodes(0))), address(MOCKY));
+        assertEq(address(newKernel.activePolicies(0)), address(policy));
     }
 
     function _initModuleAndPolicy() internal {

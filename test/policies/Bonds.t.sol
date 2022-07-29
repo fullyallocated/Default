@@ -104,4 +104,35 @@ contract BondsTest is Test {
         cost = bonds.purchase(500, 102);
         assertEq(cost, 50608);
     }
+
+     function testRevert_NotEnoughInventory() public {
+        vm.expectRevert(NotEnoughInventory.selector);
+        bonds.purchase(400_001, 500);
+
+        bonds.purchase(400_000, 500);
+        assertEq(bonds.basePrice(), 900);
+
+        // price is $9.00 after slippage
+        vm.expectRevert(NotEnoughInventory.selector);
+        bonds.purchase(1, 500);
+
+        vm.warp(block.timestamp + 1 days);  // + 25,000 PRXY tokens PRXY
+
+        vm.expectRevert(NotEnoughInventory.selector);
+        bonds.purchase(25001, 900);
+
+
+        // price is $8.75 after decay
+        uint256 cost = bonds.purchase(25000, 900);
+        assertEq(cost, 22_487_500);
+    }
+
+    function testRevert_ExecutionPriceTooHigh() public {
+        vm.expectRevert(ExecutionPriceTooHigh.selector);
+        bonds.purchase(666, 100);
+
+        vm.expectRevert(ExecutionPriceTooHigh.selector);
+        bonds.purchase(1800, 101);
+    }
+
 }

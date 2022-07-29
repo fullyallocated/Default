@@ -6,8 +6,8 @@ import "../Kernel.sol";
 
 pragma solidity ^0.8.13;
 
-error notEnoughInventory();
-error executionPriceTooHigh();
+error NotEnoughInventory();
+error ExecutionPriceTooHigh();
 
 contract Bonds is Policy {
 
@@ -85,7 +85,7 @@ contract Bonds is Policy {
         uint256 currentInventory = _min(inventory + newEmissions, MAX_INVENTORY);
         
         // revert the tx if there's not enough liquidity in the auction for the desired purchase amount
-        if (amt_ > currentInventory) { revert notEnoughInventory(); }
+        if (amt_ > currentInventory) { revert NotEnoughInventory(); }
 
         // price decay in cents, decays $ // maximum amount of liquidity that can be 0.25 per day ($0.01c every 3456 seconds, or ~57 minutes)
         uint256 priceDecay = timeElapsed * DECAY_RATE / 1 days;
@@ -108,7 +108,7 @@ contract Bonds is Policy {
         allInPrice = totalCostForWholeBlocks + totalCostForResidual + offsetPremium + residualOffset;
 
         // revert if the execution price is worse than the minPrice_
-        if (allInPrice > maxPrice_ * amt_) { revert executionPriceTooHigh(); }
+        if (allInPrice > maxPrice_ * amt_) { revert ExecutionPriceTooHigh(); }
 
         // calculate the new inventory remaining in the auctions after the sale is complete
         inventory = currentInventory - amt_;

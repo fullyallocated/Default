@@ -169,13 +169,6 @@ contract KernelTest is Test {
         vm.stopPrank();
     }
 
-    // TODO Move to bottom or separate file
-    function _approveTestPolicy() internal {
-        vm.startPrank(deployer);
-        kernel.executeAction(Actions.InstallModule, address(MOCKY));
-        kernel.executeAction(Actions.ApprovePolicy, address(policy));
-        vm.stopPrank();
-    }
 
     function testCorrectness_ApprovePolicy() public {
         Keycode testKeycode = Keycode.wrap("MOCKY");
@@ -185,7 +178,7 @@ contract KernelTest is Test {
         vm.expectRevert(err);
         kernel.executeAction(Actions.ApprovePolicy, address(policy));
 
-        _approveTestPolicy();
+        _initModuleAndPolicy();
 
         assertEq(
             kernel.modulePermissions(testKeycode, policy, MOCKY.permissionedCall.selector),
@@ -212,7 +205,7 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_CallPublicPolicyFunction() public {
-        _approveTestPolicy();
+        _initModuleAndPolicy();
 
         vm.prank(deployer);
         policy.callPublicFunction();
@@ -221,7 +214,7 @@ contract KernelTest is Test {
     }
 
     function testCorrectness_CallPermissionedPolicyFunction() public {
-        _approveTestPolicy();
+        _initModuleAndPolicy();
 
         // Test role-based auth for policy calls
         Role testerRole = Role.wrap("tester");
@@ -379,5 +372,36 @@ contract KernelTest is Test {
         vm.expectRevert(err);
         vm.prank(user);
         policy.callPermissionedFunction();
+    }
+
+    function testCorrectness_MigrateKernel() public {
+        _initModuleAndPolicy();
+
+        assertEq(address(kernel.getModuleForKeycode(kernel.allKeycodes(0))), address(MOCKY));
+        assertEq(address(kernel.activePolicies(0)), address(policy));
+
+        vm.startPrank(deployer);
+
+        // Create new kernel and migrate to it
+        Kernel newKernel = new Kernel();
+
+        kernel.executeAction(Actions.MigrateKernel, address(newKernel));
+
+        assertEq(address(MOCKY.kernel()), address(newKernel));
+        assertEq(address(policy.kernel()), address(newKernel));
+
+        // Install module and approve policy
+        newKernel.executeAction(Actions.InstallModule, address(MOCKY));
+        newKernel.executeAction(Actions.ApprovePolicy, address(policy));
+
+        assertEq(address(newKernel.getModuleForKeycode(newKernel.allKeycodes(0))), address(MOCKY));
+        assertEq(address(newKernel.activePolicies(0)), address(policy));
+    }
+
+    function _initModuleAndPolicy() internal {
+        vm.startPrank(deployer);
+        kernel.executeAction(Actions.InstallModule, address(MOCKY));
+        kernel.executeAction(Actions.ApprovePolicy, address(policy));
+        vm.stopPrank();
     }
 }

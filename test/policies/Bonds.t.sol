@@ -32,7 +32,7 @@ contract BondsTest is Test {
         bonds = new Bonds(kernel);
     }
 
-    function testCorrectness_InitializeKernel() public {
+    function testCorrectness_Initialize() public {
         assertEq(bonds.EMISSION_RATE(), 25000);
         assertEq(bonds.BATCH_SIZE(), 500);
         assertEq(bonds.DECAY_RATE(), 25);
@@ -42,5 +42,66 @@ contract BondsTest is Test {
         assertEq(bonds.prevSaleTimestamp(), 0);
         assertEq(bonds.inventory(), 400000);
         assertEq(bonds.tokenOffset(), 0);
+    }
+
+    function testCorrectness_PurchaseSingleBatch() public {
+        uint256 cost = bonds.purchase(500, 100);
+        assertEq(cost, 50000);
+    }
+
+    function testCorrectness_PurchaseMultipleBatches() public {
+        uint256 cost = bonds.purchase(25500, 140);
+        assertEq(cost, 3187500);
+    }
+
+
+    function testCorrectness_PurchaseWithResidual() public {
+        uint256 cost = bonds.purchase(666, 102);
+        assertEq(cost, 66766);
+    }
+
+    function testCorrectness_PurchaseWithOffset() public {
+        bonds.purchase(135, 102);
+
+        uint256 cost = bonds.purchase(500, 102);
+        assertEq(cost, 50135);
+    }
+
+    function testCorrectness_PurchaseWithTimeDecay() public {
+        bonds.purchase(128500, 500); // 128500 tokens purchased => +$2.57 slippage
+
+        // base price = $3.57
+        vm.warp(block.timestamp + 3 days + 7 hours); // 284400 seconds elapsed => -$0.82 decay
+
+        // base price = $2.75
+        uint256 cost = bonds.purchase(500, 275);
+        assertEq(cost, 137500);
+    }
+
+    function testCorrectness_MultiplePurchaseTransactions() public {
+        uint256 cost = bonds.purchase(500, 100);
+        assertEq(cost, 50000);
+
+        // price: 101
+        // offset: 0
+        cost = bonds.purchase(500, 101);
+        assertEq(cost, 50500);
+
+        // price: 102
+        // offset: 166
+        cost = bonds.purchase(666, 103);
+        assertEq(cost, 68098);
+
+        // price: 104
+        // offset: 108
+        cost = bonds.purchase(942, 104);
+        assertEq(cost, 97742);
+
+        vm.warp(block.timestamp + (3 days / 25)); // -$0.03 decay
+
+        // price: 101
+        // offset: 108
+        cost = bonds.purchase(500, 102);
+        assertEq(cost, 50608);
     }
 }

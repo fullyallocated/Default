@@ -96,15 +96,16 @@ contract Bonds is Policy {
         // CALCULATE THE WHOLE BATCHES
         uint256 batchesPurchased = amt_ / BATCH_SIZE;
         uint256 finalPrice = (startingPrice + batchesPurchased - 1);
-        uint256 totalCostForWholeBlocks = ((finalPrice + startingPrice) / 2) * batchesPurchased + BATCH_SIZE; 
+        uint256 totalCostForWholeBlocks = (finalPrice + startingPrice) * batchesPurchased * BATCH_SIZE / 2; 
         
         // CALCULATE THE RESIDUAL
         uint256 residual = amt_ % BATCH_SIZE;
         uint256 totalCostForResidual = (finalPrice + 1) * residual;
 
         // CALCULATE THE OFFSET PREMIUM
-        uint256 offsetPremium = tokenOffset * batchesPurchased;
-        allInPrice = totalCostForWholeBlocks + totalCostForResidual + offsetPremium;
+        uint256 offsetPremium = (tokenOffset * batchesPurchased);
+        uint256 residualOffset = (residual + tokenOffset) > BATCH_SIZE ? (residual + tokenOffset) % BATCH_SIZE : 0; 
+        allInPrice = totalCostForWholeBlocks + totalCostForResidual + offsetPremium + residualOffset;
 
         // revert if the execution price is worse than the minPrice_
         if (allInPrice > maxPrice_ * amt_) { revert executionPriceTooHigh(); }
@@ -116,10 +117,10 @@ contract Bonds is Policy {
         prevSaleTimestamp = block.timestamp;
 
         // adjust the base price
-        basePrice = _min(basePrice - priceDecay + batchesPurchased, RESERVE_PRICE);
+        basePrice = _max(basePrice - priceDecay + batchesPurchased, RESERVE_PRICE);
 
         // calculate & set the new residual for the next demand premium
-        tokenOffset = (amt_ + tokenOffset) % BATCH_SIZE;
+        tokenOffset = (residual + tokenOffset) % BATCH_SIZE;
 
         // TRSRY.depositFunds(msg.sender, allInPrice,); // no TRSRY module yet
         // VOTES.mint(msg.sender, amt_);

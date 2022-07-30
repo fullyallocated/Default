@@ -11,9 +11,11 @@ error ExecutionPriceTooHigh();
 
 contract Bonds is Policy {
 
+
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
+
 
     DefaultVotes public VOTES;
 
@@ -35,10 +37,14 @@ contract Bonds is Policy {
     }
 
 
+    /////////////////////////////////////////////////////////////////////////////////
+    //                                Policy Variables                             //
+    /////////////////////////////////////////////////////////////////////////////////
+
 
     uint256 public constant EMISSION_RATE = 25000; // tokens added to inventory per day
-    uint256 public constant BATCH_SIZE = 500; // number of tokens in each block
-    uint256 public constant DECAY_RATE = 25; // the price decay (in cents) of the auction's base price each day
+    uint256 public constant BATCH_SIZE = 500; // number of tokens in each batch
+    uint256 public constant PRICE_DECAY_RATE = 25; // the price decay (in cents) of the auction's base price each day
     uint256 public constant MAX_INVENTORY = 1000000; // maximum number of tokens available for purchase in the auction
     uint256 public constant RESERVE_PRICE = 100; // lowest possible price (in cents) for execution
 
@@ -49,7 +55,7 @@ contract Bonds is Policy {
 
 
     // Utility Functions.
-
+    
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
@@ -59,12 +65,19 @@ contract Bonds is Policy {
         return a > b ? a : b;
     }
 
-    // PRICE
+
+    // PRICE SLIPPAGE
     //
-    // In proxy, tokens are sold in a batches of 500 tokens. Each batch of tokens sold in the auction
-    // is $0.01 more expensive than the previous batch. The auction price decreases at a rate of $0.25 each
-    // day, down to a $1.00 minimum reserve price. Batches can be partially bought, and the remaining tokens
-    // may be purchased by a different buyer.
+    // In Bonds, tokens are auctioned in 'batches' of 500 tokens that increase linearly in price. Each batch of
+    // tokens is priced $0.01 more expensive than its previous batch. As more tokens are purchased, the price of
+    // the auction rises. Like in traditional markets, larger orders of tokens impact the auction price faster and
+    // have worse overall price execution (slippage) than smaller orders.
+
+
+    // PRICE DECAY
+    //
+    // The price of the tokens in the bond decrease linearly over time. Every 24 hours, the price decreases by .25c.
+    // The more time passes between sales, the cheaper the price becomes, down to a lower limit of $1. 
 
 
     // INVENTORY
@@ -73,56 +86,66 @@ contract Bonds is Policy {
     // The inventory "refills" over time at a rate of 25,000 tokens per day.
 
 
-    function purchase(uint256 amt_, uint256 maxPrice_) external returns (uint256 allInPrice) {
-
-        // save the amount of seconds elapsed since the last sale
-        uint256 timeElapsed = block.timestamp - prevSaleTimestamp;
-
+    function getCurrentInventory() public view returns (uint256 currentInventory) {
         // calculate the total tokens available in the auction since based on available inventory and emissions
-        uint256 newEmissions = timeElapsed * EMISSION_RATE / 1 days;
+        uint256 newEmissions = (block.timestamp - prevSaleTimestamp) * EMISSION_RATE / 1 days;
 
         // calculate the current inventory based on previous inventory and new emissions
-        uint256 currentInventory = _min(inventory + newEmissions, MAX_INVENTORY);
-        
-        // revert the tx if there's not enough liquidity in the auction for the desired purchase amount
-        if (amt_ > currentInventory) { revert NotEnoughInventory(); }
+        currentInventory = _min(inventory + newEmissions, MAX_INVENTORY);
+    }
 
+
+    function getTotalCost(uint256 tokensPurchased_) public view returns (uint256 totalCost, uint256 newBasePrice) {
         // price decay in cents, decays $ // maximum amount of liquidity that can be 0.25 per day ($0.01c every 3456 seconds, or ~57 minutes)
-        uint256 priceDecay = timeElapsed * DECAY_RATE / 1 days;
+        uint256 priceDecay = (block.timestamp - prevSaleTimestamp) * PRICE_DECAY_RATE / 1 days;
 
         // starting price of current auction based on the final base price after last sale and time decay
         uint256 startingPrice = _max(basePrice - priceDecay, RESERVE_PRICE);
         
         // CALCULATE THE WHOLE BATCHES
-        uint256 batchesPurchased = amt_ / BATCH_SIZE;
+        uint256 batchesPurchased = tokensPurchased_ / BATCH_SIZE;
         uint256 finalPrice = (startingPrice + batchesPurchased - 1);
-        uint256 totalCostForWholeBlocks = (finalPrice + startingPrice) * batchesPurchased * BATCH_SIZE / 2; 
+        uint256 totalCostForWholeBatches = (finalPrice + startingPrice) * batchesPurchased * BATCH_SIZE / 2; 
         
         // CALCULATE THE RESIDUAL
-        uint256 residual = amt_ % BATCH_SIZE;
+        uint256 residual = tokensPurchased_ % BATCH_SIZE;
         uint256 totalCostForResidual = (finalPrice + 1) * residual;
 
         // CALCULATE THE OFFSET PREMIUM
         uint256 offsetPremium = (tokenOffset * batchesPurchased);
-        uint256 residualOffset = (residual + tokenOffset) > BATCH_SIZE ? (residual + tokenOffset) % BATCH_SIZE : 0; 
-        allInPrice = totalCostForWholeBlocks + totalCostForResidual + offsetPremium + residualOffset;
+        uint256 residualOffsetPremium = (residual + tokenOffset) > BATCH_SIZE ? (residual + tokenOffset) % BATCH_SIZE : 0; 
+        
+        totalCost = totalCostForWholeBatches + totalCostForResidual + offsetPremium + residualOffsetPremium;
+        newBasePrice = _max(basePrice - priceDecay + batchesPurchased, RESERVE_PRICE);
+    }
+
+
+    function purchase(uint256 tokensPurchased_, uint256 maxPrice_) external returns (uint256) {
+
+        uint256 currentInventory = getCurrentInventory();
+        (uint256 totalCost, uint256 newBasePrice) = getTotalCost(tokensPurchased_);
+
+        // revert the tx if there's not enough liquidity in the auction for the desired purchase amount
+        if (tokensPurchased_ > currentInventory) { revert NotEnoughInventory(); }
 
         // revert if the execution price is worse than the minPrice_
-        if (allInPrice > maxPrice_ * amt_) { revert ExecutionPriceTooHigh(); }
+        if (totalCost > maxPrice_ * tokensPurchased_) { revert ExecutionPriceTooHigh(); }
 
-        // calculate the new inventory remaining in the auctions after the sale is complete
-        inventory = currentInventory - amt_;
+        // save the new inventory after purchase
+        inventory = currentInventory - tokensPurchased_;
 
-        // reset the last purchase timestamp
+        // reset the purchase timestamp
         prevSaleTimestamp = block.timestamp;
 
-        // adjust the base price
-        basePrice = _max(basePrice - priceDecay + batchesPurchased, RESERVE_PRICE);
+        // set the new base price after purchase
+        basePrice = newBasePrice;
 
-        // calculate & set the new residual for the next demand premium
-        tokenOffset = (residual + tokenOffset) % BATCH_SIZE;
+        // calculate & set the new token offest
+        tokenOffset = (tokensPurchased_ + tokenOffset) % BATCH_SIZE;
+
+        return totalCost;
 
         // TRSRY.depositFunds(msg.sender, allInPrice,); // no TRSRY module yet
-        // VOTES.mint(msg.sender, amt_);
+        // VOTES.mint(msg.sender, tokensPurchased_);
     }
 }

@@ -35,7 +35,7 @@ contract BondsTest is Test {
     function testCorrectness_Initialize() public {
         assertEq(bonds.EMISSION_RATE(), 25000);
         assertEq(bonds.BATCH_SIZE(), 500);
-        assertEq(bonds.DECAY_RATE(), 25);
+        assertEq(bonds.PRICE_DECAY_RATE(), 25);
         assertEq(bonds.MAX_INVENTORY(), 1000000);
         assertEq(bonds.RESERVE_PRICE(), 100);
         assertEq(bonds.basePrice(), 100);

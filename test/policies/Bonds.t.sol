@@ -29,7 +29,7 @@ contract BondsTest is Test {
 
         kernel = new Kernel();
         VOTES = new DefaultVotes(kernel);
-        bonds = new Bonds(kernel);
+        bonds = new Bonds(kernel, ERC20(address(0))); // <= create fake token addr
     }
 
     function testCorrectness_Initialize() public {

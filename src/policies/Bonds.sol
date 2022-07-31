@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Proxy Bonds are a modified gradual dutch auction mechanism for protocols to sell their native tokens.
 
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 import "../modules/VOTES.sol";
+import "../modules/TRSRY.sol";
 import "../Kernel.sol";
 
 pragma solidity ^0.8.13;
@@ -18,8 +20,11 @@ contract Bonds is Policy {
 
 
     DefaultVotes public VOTES;
+    DefaultTreasury public TRSRY;
 
-    constructor(Kernel kernel_) Policy(kernel_) {}
+    constructor(Kernel kernel_, ERC20 DAI_) Policy(kernel_) {
+        DAI = DAI_; // set the address of payment currency
+    }
 
     function configureDependencies() external override onlyKernel returns (Keycode[] memory dependencies) {
         dependencies = new Keycode[](1);
@@ -27,13 +32,15 @@ contract Bonds is Policy {
         dependencies[0] = toKeycode("VOTES");
         VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
 
-        // dependencies[1] = toKeycode("TRSRY");
-        // TRSRY = DefaultTreasury(getModuleAddress(toKeycode("TRSRY")));
+        dependencies[1] = toKeycode("TRSRY");
+        TRSRY = DefaultTreasury(getModuleAddress(toKeycode("TRSRY")));
     }
 
     function requestPermissions() external view override onlyKernel returns (Permissions[] memory requests) {
-        requests = new Permissions[](1);
+        requests = new Permissions[](2);
         requests[0] = Permissions(toKeycode("VOTES"), VOTES.mintTo.selector);
+        requests[1] = Permissions(toKeycode("TRSRY"), TRSRY.depositFrom.selector);
+
     }
 
 
@@ -41,6 +48,8 @@ contract Bonds is Policy {
     //                                Policy Variables                             //
     /////////////////////////////////////////////////////////////////////////////////
 
+
+    ERC20 public DAI; // DAI contract addr
 
     uint256 public constant EMISSION_RATE = 25000; // tokens added to inventory per day
     uint256 public constant BATCH_SIZE = 500; // number of tokens in each batch
@@ -66,25 +75,10 @@ contract Bonds is Policy {
     }
 
 
-    // PRICE SLIPPAGE
-    //
-    // In Bonds, tokens are auctioned in 'batches' of 500 tokens that increase linearly in price. Each batch of
-    // tokens is priced $0.01 more expensive than its previous batch. As more tokens are purchased, the price of
-    // the auction rises. Like in traditional markets, larger orders of tokens impact the auction price faster and
-    // have worse overall price execution (slippage) than smaller orders.
-
-
-    // PRICE DECAY
-    //
-    // The price of the tokens in the bond decrease linearly over time. Every 24 hours, the price decreases by .25c.
-    // The more time passes between sales, the cheaper the price becomes, down to a lower limit of $1. 
-
-
     // INVENTORY
-    //    
+
     // The auction can hold up to a maximum of 1,000,000 tokens in the inventory at a given time. 
     // The inventory "refills" over time at a rate of 25,000 tokens per day.
-
 
     function getCurrentInventory() public view returns (uint256 currentInventory) {
         // calculate the total tokens available in the auction since based on available inventory and emissions
@@ -94,6 +88,18 @@ contract Bonds is Policy {
         currentInventory = _min(inventory + newEmissions, MAX_INVENTORY);
     }
 
+
+    // PRICE
+
+    // The auction price is a factor of two variables: slippage and price decay. 
+    
+    // In Default Bonds, tokens are auctioned in 'batches' of 500 tokens. Each batch of tokens is 
+    // priced $0.01 more expensive than its previous batch. As more tokens are purchased, the price
+    // of the auction rises. Like in traditional markets, larger orders of tokens impact the auction
+    // price faster and have worse overall price execution (slippage) than smaller orders.
+
+    // The price of the tokens in the bond decrease linearly over time. Every 24 hours, the price decreases by .25c.
+    // The more time passes between sales, the cheaper the price becomes, down to a lower limit of $1. 
 
     function getTotalCost(uint256 tokensPurchased_) public view returns (uint256 totalCost, uint256 newBasePrice) {
         // price decay in cents, decays $ // maximum amount of liquidity that can be 0.25 per day ($0.01c every 3456 seconds, or ~57 minutes)
@@ -143,9 +149,9 @@ contract Bonds is Policy {
         // calculate & set the new token offest
         tokenOffset = (tokensPurchased_ + tokenOffset) % BATCH_SIZE;
 
-        return totalCost;
+        // return totalCost;  <=  currently used for testing, but should change tests now 
 
-        // TRSRY.depositFunds(msg.sender, allInPrice,); // no TRSRY module yet
-        // VOTES.mint(msg.sender, tokensPurchased_);
+        TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
+        VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
     }
 }

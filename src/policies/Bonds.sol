@@ -51,20 +51,18 @@ contract Bonds is Policy {
 
     ERC20 public DAI; // DAI contract addr
 
-    uint256 public constant EMISSION_RATE = 25000; // tokens added to inventory per day
-    uint256 public constant BATCH_SIZE = 500; // number of tokens in each batch
-    uint256 public constant PRICE_DECAY_RATE = 25; // the price decay (in cents) of the auction's base price each day
-    uint256 public constant MAX_INVENTORY = 1000000; // maximum number of tokens available for purchase in the auction
-    uint256 public constant RESERVE_PRICE = 100; // lowest possible price (in cents) for execution
+    uint256 public constant EMISSION_RATE = 25000; // tokens added to auction inventory per day
+    uint256 public constant SLIPPAGE_RATE = 15; // price increase per token, denominated in 1/10,000th's of a cent (+ 15c / 10,000 tokens)
+    uint256 public constant PRICE_DECAY_RATE = 187_500; // the rate that token prices decay each day, denominated in 1/10,000th's of a cent (~.19c / day)
+    uint256 public constant MAX_INVENTORY = 1_000_000; // maximum number of tokens available for purchase in the auction
+    uint256 public constant RESERVE_PRICE = 1_000_000; // lowest possible price for tokens to be sold in auction
 
-    uint256 public basePrice = 100; // the base price of the auction after the last sale (initially $1.00)
+    uint256 public basePrice = 1_000_000; // the base price of the auction after the last sale, priced in 1/10,000th's of a cent (starts at $1.00)
     uint256 public prevSaleTimestamp; // the timestamp of the last purchase made at the bond
-    uint256 public inventory = 400000; // the amount of tokens available for purchase in the auction (initially 300,000 PRXY)
-    uint256 public tokenOffset; // the amount of tokens offset in an auction block due to previous sales
+    uint256 public inventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
 
 
     // Utility Functions.
-    
 
     function _min(uint256 a, uint256 b) internal pure returns (uint256) {
         return a < b ? a : b;
@@ -73,7 +71,6 @@ contract Bonds is Policy {
     function _max(uint256 a, uint256 b) internal pure returns (uint256) {
         return a > b ? a : b;
     }
-
 
     // INVENTORY
 
@@ -105,24 +102,15 @@ contract Bonds is Policy {
         // price decay in cents, decays $ // maximum amount of liquidity that can be 0.25 per day ($0.01c every 3456 seconds, or ~57 minutes)
         uint256 priceDecay = (block.timestamp - prevSaleTimestamp) * PRICE_DECAY_RATE / 1 days;
 
-        // starting price of current auction based on the final base price after last sale and time decay
+        // calculate starting price of current sale based on the last recorded base price and timestamp from the previous sale
         uint256 startingPrice = _max(basePrice - priceDecay, RESERVE_PRICE);
-        
-        // CALCULATE THE WHOLE BATCHES
-        uint256 batchesPurchased = tokensPurchased_ / BATCH_SIZE;
-        uint256 finalPrice = (startingPrice + batchesPurchased - 1);
-        uint256 totalCostForWholeBatches = (finalPrice + startingPrice) * batchesPurchased * BATCH_SIZE / 2; 
-        
-        // CALCULATE THE RESIDUAL
-        uint256 residual = tokensPurchased_ % BATCH_SIZE;
-        uint256 totalCostForResidual = (finalPrice + 1) * residual;
 
-        // CALCULATE THE OFFSET PREMIUM
-        uint256 offsetPremium = (tokenOffset * batchesPurchased);
-        uint256 residualOffsetPremium = (residual + tokenOffset) > BATCH_SIZE ? (residual + tokenOffset) % BATCH_SIZE : 0; 
-        
-        totalCost = totalCostForWholeBatches + totalCostForResidual + offsetPremium + residualOffsetPremium;
-        newBasePrice = _max(basePrice - priceDecay + batchesPurchased, RESERVE_PRICE);
+        // final price of current sale including slippage from on tokens purchased
+        uint256 finalPrice = startingPrice + (SLIPPAGE_RATE * tokensPurchased_);
+
+        // get the average execution price
+        totalCost = tokensPurchased_ * (startingPrice + finalPrice) / 2; 
+        newBasePrice = finalPrice;
     }
 
 
@@ -146,12 +134,9 @@ contract Bonds is Policy {
         // set the new base price after purchase
         basePrice = newBasePrice;
 
-        // calculate & set the new token offest
-        tokenOffset = (tokensPurchased_ + tokenOffset) % BATCH_SIZE;
-
         // return totalCost;  <=  currently used for testing, but should change tests now 
 
-        TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
-        VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
+        // TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
+        // VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
     }
 }

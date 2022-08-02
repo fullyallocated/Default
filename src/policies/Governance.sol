@@ -2,7 +2,7 @@
 
 // The Governance Policy submits & activates instructions in a INSTR module
 
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.15;
 
 import "../Kernel.sol";
 import { DefaultInstructions, Actions, Instruction } from "../modules/INSTR.sol";
@@ -259,6 +259,10 @@ contract Governance is Policy {
             }
         }
 
+        // reward the proposer with 2% of the token supply
+        address proposer = getProposalMetadata[activeProposal.instructionsId].proposer;
+        VOTES.mintTo(proposer, VOTES.totalSupply() * 2 / 100);
+
         // emit the corresponding event
         emit ProposalExecuted(activeProposal.instructionsId);
 
@@ -290,5 +294,8 @@ contract Governance is Policy {
 
         // return the tokens back to the user
         VOTES.transferFrom(address(this), msg.sender, userVotes);
+
+        // mint a bonus reward (+.4%) to the user for participation
+        VOTES.mintTo(msg.sender, userVotes / 250);
     }
 }

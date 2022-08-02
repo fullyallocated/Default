@@ -6,7 +6,7 @@ import "../modules/VOTES.sol";
 import "../modules/TRSRY.sol";
 import "../Kernel.sol";
 
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.15;
 
 contract Redemption is Policy {
 

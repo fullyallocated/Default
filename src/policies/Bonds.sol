@@ -6,7 +6,7 @@ import "../modules/VOTES.sol";
 import "../modules/TRSRY.sol";
 import "../Kernel.sol";
 
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.15;
 
 error NotEnoughInventory();
 error ExecutionPriceTooHigh();
@@ -88,15 +88,9 @@ contract Bonds is Policy {
 
     // PRICE
 
-    // The auction price is a factor of two variables: slippage and price decay. 
-    
-    // In Default Bonds, tokens are auctioned in 'batches' of 500 tokens. Each batch of tokens is 
-    // priced $0.01 more expensive than its previous batch. As more tokens are purchased, the price
-    // of the auction rises. Like in traditional markets, larger orders of tokens impact the auction
-    // price faster and have worse overall price execution (slippage) than smaller orders.
-
-    // The price of the tokens in the bond decrease linearly over time. Every 24 hours, the price decreases by .25c.
-    // The more time passes between sales, the cheaper the price becomes, down to a lower limit of $1. 
+    // The auction price is a factor of two variables how many tokens are purchased and 
+    // time elasped since the previous sale. Each token purchased increases the price of
+    // each subsequent token, and the price goes down linearly over time.
 
     function getTotalCost(uint256 tokensPurchased_) public view returns (uint256 totalCost, uint256 newBasePrice) {
         // price decay in cents, decays $ // maximum amount of liquidity that can be 0.25 per day ($0.01c every 3456 seconds, or ~57 minutes)
@@ -136,7 +130,7 @@ contract Bonds is Policy {
 
         // return totalCost;  <=  currently used for testing, but should change tests now 
 
-        // TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
-        // VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
+        TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
+        VOTES.mintTo(msg.sender, tokensPurchased_ * 1e3); // <= TEST THIS, untested
     }
 }

@@ -1,11 +1,19 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.15;
 
 import { Test } from "forge-std/Test.sol";
 import { UserFactory } from "test-utils/UserFactory.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
 import "src/Kernel.sol";
 import "src/modules/VOTES.sol";
 import "src/policies/Bonds.sol";
+
+contract MockDAI is ERC20("DAI", "DAI", 18) {
+    
+    function mint(address to_, uint256 amt_) public {
+        _mint(to_, amt_);
+    }
+}
 
 
 contract BondsTest is Test {
@@ -18,6 +26,8 @@ contract BondsTest is Test {
     address public user2;
     address public user3;
 
+    ERC20 public DAI;    
+
     bytes public err;
 
     function setUp() public {
@@ -27,13 +37,16 @@ contract BondsTest is Test {
         user2 = users[1];
         user3 = users[2];
 
+        DAI = new MockDAI();
+
         kernel = new Kernel();
         VOTES = new DefaultVotes(kernel);
-        bonds = new Bonds(kernel, ERC20(address(0))); // <= create fake token addr
+        bonds = new Bonds(kernel, DAI); // <= create fake token addr
     }
 
     function testCorrectness_Initialize() public {
         assertEq(bonds.EMISSION_RATE(), 25000);
+        assertEq(bonds.EMISSION_RATE(), 15);
         assertEq(bonds.PRICE_DECAY_RATE(), 187_500);
         assertEq(bonds.MAX_INVENTORY(), 1_000_000);
         assertEq(bonds.RESERVE_PRICE(), 1_000_000);

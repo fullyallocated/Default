@@ -2,7 +2,7 @@
 
 // [VOTES] The Votes Module is the ERC20 token that represents voting power in the network.
 
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.15;
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 import "src/Kernel.sol";
@@ -10,7 +10,7 @@ import "src/Kernel.sol";
 error VOTES_TransferDisabled();
 
 contract DefaultVotes is Module, ERC20 {
-    constructor(Kernel kernel_) Module(kernel_) ERC20("Dummy Voting Tokens", "VOTES", 0) {}
+    constructor(Kernel kernel_) Module(kernel_) ERC20("Voting Tokens", "VOTES", 3) {}
 
     function KEYCODE() public pure override returns (Keycode) {
         return Keycode.wrap("VOTES");

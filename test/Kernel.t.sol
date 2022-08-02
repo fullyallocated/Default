@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: AGPL-3.0-only
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.15;
 
 import { Test } from "forge-std/Test.sol";
 import { UserFactory } from "test-utils/UserFactory.sol";

@@ -2,7 +2,7 @@
 
 // [INSTR] The Instructions Module caches and executes batched instructions for protocol upgrades in the Kernel
 
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.15;
 
 import "src/Kernel.sol";
 
@@ -12,6 +12,7 @@ error INSTR_InvalidTargetNotAContract();
 error INSTR_InvalidModuleKeycode();
 
 contract DefaultInstructions is Module {
+
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Module Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////

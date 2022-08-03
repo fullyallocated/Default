@@ -8,7 +8,15 @@ import "../Kernel.sol";
 
 pragma solidity ^0.8.15;
 
-contract Redemption is Policy {
+
+interface IRedemption {
+
+    // redeeming
+    event TokensRedeemed(address redeemer, uint256 amt);
+}
+
+
+contract Redemption is Policy, IRedemption {
 
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -35,7 +43,6 @@ contract Redemption is Policy {
         requests = new Permissions[](2);
         requests[0] = Permissions(toKeycode("VOTES"), VOTES.burnFrom.selector);
         requests[1] = Permissions(toKeycode("TRSRY"), TRSRY.withdraw.selector);
-
     }
 
 
@@ -62,5 +69,7 @@ contract Redemption is Policy {
 
             unchecked {++i;}
         }
+
+        emit TokensRedeemed(msg.sender, amount_);
     }
 }

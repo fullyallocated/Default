@@ -8,10 +8,17 @@ import "../Kernel.sol";
 
 pragma solidity ^0.8.15;
 
-error NotEnoughInventory();
-error ExecutionPriceTooHigh();
 
-contract Bonds is Policy {
+interface IBond {
+    
+    // purchasing
+    event TokensPurchased(address buyer, uint256 tokens, uint256 totalCost);
+    error NotEnoughInventory();
+    error ExecutionPriceTooHigh();
+}
+
+
+contract Bond is Policy, IBond {
 
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -60,6 +67,11 @@ contract Bonds is Policy {
     uint256 public basePrice = 1_000_000; // the base price of the auction after the last sale, priced in 1/10,000th's of a cent (starts at $1.00)
     uint256 public prevSaleTimestamp; // the timestamp of the last purchase made at the bond
     uint256 public inventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
+
+
+    /////////////////////////////////////////////////////////////////////////////////
+    //                              View Functions                                 //
+    /////////////////////////////////////////////////////////////////////////////////
 
 
     // Utility Functions.
@@ -132,5 +144,7 @@ contract Bonds is Policy {
 
         TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
         VOTES.mintTo(msg.sender, tokensPurchased_ * 1e3); // <= TEST THIS, untested
+
+        emit TokensPurchased(msg.sender, tokensPurchased_, totalCost);
     }
 }

@@ -8,48 +8,62 @@ import "../Kernel.sol";
 import { DefaultInstructions, Actions, Instruction } from "../modules/INSTR.sol";
 import { DefaultVotes } from "../modules/VOTES.sol";
 
-// proposing
-error NotEnoughVotesToPropose();
 
-// endorsing
-error CannotEndorseNullProposal();
-error CannotEndorseInvalidProposal();
+interface IGovernance {
 
-// activating
-error NotAuthorizedToActivateProposal();
-error NotEnoughEndorsementsToActivateProposal();
-error ProposalAlreadyActivated();
-error ActiveProposalNotExpired();
-error SubmittedProposalHasExpired();
+    struct ProposalMetadata {
+        bytes32 proposalName;
+        address proposer;
+        uint256 submissionTimestamp;
+    }
 
-// voting
-error NoActiveProposalDetected();
-error UserAlreadyVoted();
+    struct ActivatedProposal {
+        uint256 instructionsId;
+        uint256 activationTimestamp;
+    }
+    
+    event ProposalSubmitted(uint256 instructionsId);
+    event ProposalEndorsed(uint256 instructionsId, address voter, uint256 amount);
+    event ProposalActivated(uint256 instructionsId, uint256 timestamp);
+    event WalletVoted(uint256 instructionsId, address voter, bool for_, uint256 userVotes);
+    event ProposalExecuted(uint256 instructionsId);
+    
+    // proposing
+    error NotEnoughVotesToPropose();
 
-// executing
-error NotEnoughVotesToExecute();
-error ExecutionTimelockStillActive();
+    // endorsing
+    error CannotEndorseNullProposal();
+    error CannotEndorseInvalidProposal();
 
-// claiming
-error VotingTokensAlreadyReclaimed();
-error CannotReclaimTokensForActiveVote();
-error CannotReclaimZeroVotes();
+    // activating
+    error NotAuthorizedToActivateProposal();
+    error NotEnoughEndorsementsToActivateProposal();
+    error ProposalAlreadyActivated();
+    error ActiveProposalNotExpired();
+    error SubmittedProposalHasExpired();
 
-struct ProposalMetadata {
-    bytes32 proposalName;
-    address proposer;
-    uint256 submissionTimestamp;
+    // voting
+    error NoActiveProposalDetected();
+    error UserAlreadyVoted();
+
+    // executing
+    error NotEnoughVotesToExecute();
+    error ExecutionTimelockStillActive();
+
+    // claiming
+    error VotingTokensAlreadyReclaimed();
+    error CannotReclaimTokensForActiveVote();
+    error CannotReclaimZeroVotes();
 }
 
-struct ActivatedProposal {
-    uint256 instructionsId;
-    uint256 activationTimestamp;
-}
 
-contract Governance is Policy {
+contract Governance is Policy, IGovernance {
+
+
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Policy Configuration                         //
     /////////////////////////////////////////////////////////////////////////////////
+
 
     DefaultInstructions public INSTR;
     DefaultVotes public VOTES;
@@ -80,43 +94,50 @@ contract Governance is Policy {
         requests[3] = Permissions(toKeycode("VOTES"), VOTES.transferFrom.selector);
     }
 
+
     /////////////////////////////////////////////////////////////////////////////////
     //                             Policy Variables                                //
     /////////////////////////////////////////////////////////////////////////////////
 
-    event ProposalSubmitted(uint256 instructionsId);
-    event ProposalEndorsed(uint256 instructionsId, address voter, uint256 amount);
-    event ProposalActivated(uint256 instructionsId, uint256 timestamp);
-    event WalletVoted(uint256 instructionsId, address voter, bool for_, uint256 userVotes);
-    event ProposalExecuted(uint256 instructionsId);
 
     // currently active proposal
     ActivatedProposal public activeProposal;
 
     mapping(uint256 => ProposalMetadata) public getProposalMetadata;
-
     mapping(uint256 => uint256) public totalEndorsementsForProposal;
-    mapping(uint256 => mapping(address => uint256))
-        public userEndorsementsForProposal;
+    mapping(uint256 => mapping(address => uint256)) public userEndorsementsForProposal;
     mapping(uint256 => bool) public proposalHasBeenActivated;
-
     mapping(uint256 => uint256) public yesVotesForProposal;
     mapping(uint256 => uint256) public noVotesForProposal;
     mapping(uint256 => mapping(address => uint256)) public userVotesForProposal;
-
     mapping(uint256 => mapping(address => bool)) public tokenClaimsForProposal;
 
+    uint256 public constant ACTIVATION_DEADLINE = 2 weeks; // amount of time a submitted proposal has to activate before it expires
+    uint256 public constant GRACE_PERIOD = 1 weeks; // amount of time an activated proposal can stay up before it can be replaced
+    uint256 public constant ENDORSEMENT_THRESHOLD = 20; // required percentage of total supply to activate a proposal (in percentage)
+    uint256 public constant EXECUTION_THRESHOLD = 33; // required net votes to execute a proposal (in percentage)
+    uint256 public constant VOTER_REWARD_RATE = 40;  // voter reward rate (in basis points)
+
+
     /////////////////////////////////////////////////////////////////////////////////
-    //                               User Actions                                  //
+    //                              View Functions                                 //
     /////////////////////////////////////////////////////////////////////////////////
+
 
     function getMetadata(uint256 instructionsId_) public view returns (ProposalMetadata memory) {
         return getProposalMetadata[instructionsId_];
     }
 
+
     function getActiveProposal() public view returns (ActivatedProposal memory) {
         return activeProposal;
     }
+
+
+    /////////////////////////////////////////////////////////////////////////////////
+    //                               User Actions                                  //
+    /////////////////////////////////////////////////////////////////////////////////
+
 
     function submitProposal(Instruction[] calldata instructions_, bytes32 proposalName_) external {
         // require the proposing wallet to own at least 1% of the outstanding governance power
@@ -173,12 +194,12 @@ contract Governance is Policy {
         }
 
         // proposals must be activated within 2 weeks of submission or they expire
-        if (block.timestamp > proposal.submissionTimestamp + 2 weeks) {
+        if (block.timestamp > proposal.submissionTimestamp + ACTIVATION_DEADLINE) {
             revert SubmittedProposalHasExpired();
         }
 
         // require endorsements from at least 20% of the total outstanding governance power
-        if ((totalEndorsementsForProposal[instructionsId_] * 5) < VOTES.totalSupply()) {
+        if ((totalEndorsementsForProposal[instructionsId_] * 100) < VOTES.totalSupply() * ENDORSEMENT_THRESHOLD) {
             revert NotEnoughEndorsementsToActivateProposal();
         }
 
@@ -235,12 +256,9 @@ contract Governance is Policy {
 
     function executeProposal() external {
         // require the net votes (yes - no) to be greater than 33% of the total voting supply
-        if (
-            (yesVotesForProposal[activeProposal.instructionsId] -
-                noVotesForProposal[activeProposal.instructionsId]) *
-                3 <
-            VOTES.totalSupply()
-        ) {
+
+        uint256 netVotes = yesVotesForProposal[activeProposal.instructionsId] - noVotesForProposal[activeProposal.instructionsId];
+        if (netVotes * 100 < VOTES.totalSupply() * EXECUTION_THRESHOLD) {
             revert NotEnoughVotesToExecute();
         }
 
@@ -254,9 +272,7 @@ contract Governance is Policy {
 
         for (uint256 step; step < instructions.length; ) {
             kernel.executeAction(instructions[step].action, instructions[step].target);
-            unchecked {
-                ++step;
-            }
+            unchecked { ++step; }
         }
 
         // reward the proposer with 2% of the token supply
@@ -296,6 +312,6 @@ contract Governance is Policy {
         VOTES.transferFrom(address(this), msg.sender, userVotes);
 
         // mint a bonus reward (+.4%) to the user for participation
-        VOTES.mintTo(msg.sender, userVotes / 250);
+        VOTES.mintTo(msg.sender, userVotes * VOTER_REWARD_RATE / 10000);
     }
 }

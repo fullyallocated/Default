@@ -1,5 +1,6 @@
-[default]
+[profile.default]
 solc_version = "0.8.13"
+ffi = true
 remappings = [
     'ds-test/=lib/ds-test/src/',
     'solmate/=lib/solmate/src/',

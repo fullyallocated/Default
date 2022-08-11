@@ -2,16 +2,26 @@
 pragma solidity ^0.8.13;
 
 import { Test } from "forge-std/Test.sol";
+import { console2 } from "forge-std/console2.sol";
 import { UserFactory } from "test-utils/UserFactory.sol";
-import "src/Kernel.sol";
-import "src/modules/VOTES.sol";
-import "src/policies/Bonds.sol";
+
+import { MockERC20 } from "solmate/test/utils/mocks/MockERC20.sol";
+import { ERC20 } from "solmate/tokens/ERC20.sol";
+
+import { Kernel, Actions } from "src/Kernel.sol";
+import { DefaultVotes } from "src/modules/VOTES.sol";
+import { DefaultTreasury } from "src/modules/TRSRY.sol";
+import { Bonds } from "src/policies/Bonds.sol";
 
 
 contract BondsTest is Test {
     Kernel internal kernel;
-    DefaultVotes internal VOTES;
+
+    MockERC20 internal DAI;
+
     Bonds internal bonds;
+    DefaultVotes internal VOTES;
+    DefaultTreasury internal TRSRY;
 
     UserFactory public userFactory;
     address public user1;
@@ -27,9 +37,26 @@ contract BondsTest is Test {
         user2 = users[1];
         user3 = users[2];
 
+        DAI = new MockERC20("DAI", "DAI", 18);
+        DAI.mint(user1, 1000*1e18);
+        DAI.mint(user2, 1000*1e18);
+        DAI.mint(user3, 1000*1e18);
+
+        // deploy default kernel
         kernel = new Kernel();
         VOTES = new DefaultVotes(kernel);
-        bonds = new Bonds(kernel, ERC20(address(0))); // <= create fake token addr
+        bonds = new Bonds(kernel, DAI);
+
+        // deploy treasury
+        ERC20[] memory approvedTokens = new ERC20[](2);
+        approvedTokens[0] = ERC20(DAI);
+        approvedTokens[1] = ERC20(VOTES);
+        TRSRY = new DefaultTreasury(kernel, approvedTokens);
+
+        // set up kernel
+        kernel.executeAction(Actions.InstallModule, address(VOTES));
+        kernel.executeAction(Actions.InstallModule, address(TRSRY));
+        kernel.executeAction(Actions.ApprovePolicy, address(bonds));
     }
 
     function testCorrectness_Initialize() public {
@@ -39,7 +66,49 @@ contract BondsTest is Test {
         assertEq(bonds.RESERVE_PRICE(), 1_000_000);
         assertEq(bonds.basePrice(), 1_000_000);
         assertEq(bonds.prevSaleTimestamp(), 0);
-        assertEq(bonds.inventory(), 400_000);
+        assertEq(bonds.getCurrentInventory(), 400_000);
+    }
+
+    function testCorrectness_PurchaseSingleBond() public {
+        vm.startPrank(user1);
+
+        // variants
+        uint256 amtToPurchase = 1;
+        (uint256 totalCost, ) = bonds.getTotalCost(amtToPurchase);
+        uint256 startingBalance = DAI.balanceOf(address(user1));
+
+        // purchase bond
+        DAI.approve(address(TRSRY), totalCost);
+        bonds.purchase(amtToPurchase, totalCost);
+
+        // assert that dai has been transfered
+        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost);
+
+        // assert that votes have been received
+        assertEq(VOTES.balanceOf(address(user1)), amtToPurchase);
+
+        vm.stopPrank();
+    }
+
+    function testCorrectness_PurchaseManyBonds() public {
+        vm.startPrank(user2);
+
+        // variants
+        uint256 amtToPurchase = 100;
+        (uint256 totalCost, ) = bonds.getTotalCost(amtToPurchase);
+        uint256 startingBalance = DAI.balanceOf(address(user1));
+
+        // purchase bond
+        DAI.approve(address(TRSRY), totalCost);
+        bonds.purchase(amtToPurchase, totalCost);
+
+        // assert dai has been transfered
+        assertEq(DAI.balanceOf(address(user2)), startingBalance - totalCost);
+
+        // assert that votes have been received
+        assertEq(VOTES.balanceOf(address(user2)), amtToPurchase);
+
+        vm.stopPrank();
     }
 
     // function testCorrectness_PurchaseSingleBatch() public {

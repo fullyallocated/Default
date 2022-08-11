@@ -2,9 +2,10 @@
 // Proxy Bonds are a modified gradual dutch auction mechanism for protocols to sell their native tokens.
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-import "../modules/VOTES.sol";
-import "../modules/TRSRY.sol";
-import "../Kernel.sol";
+import { DefaultVotes } from "../modules/VOTES.sol";
+import { DefaultTreasury } from "../modules/TRSRY.sol";
+import { Kernel, Policy, Permissions, Keycode } from "../Kernel.sol";
+import { toKeycode } from "../utils/KernelUtils.sol";
 
 pragma solidity ^0.8.13;
 
@@ -27,7 +28,7 @@ contract Bonds is Policy {
     }
 
     function configureDependencies() external override onlyKernel returns (Keycode[] memory dependencies) {
-        dependencies = new Keycode[](1);
+        dependencies = new Keycode[](2);
         
         dependencies[0] = toKeycode("VOTES");
         VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
@@ -59,7 +60,7 @@ contract Bonds is Policy {
 
     uint256 public basePrice = 1_000_000; // the base price of the auction after the last sale, priced in 1/10,000th's of a cent (starts at $1.00)
     uint256 public prevSaleTimestamp; // the timestamp of the last purchase made at the bond
-    uint256 public inventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
+    uint256 internal inventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
 
 
     // Utility Functions.
@@ -109,12 +110,12 @@ contract Bonds is Policy {
         uint256 finalPrice = startingPrice + (SLIPPAGE_RATE * tokensPurchased_);
 
         // get the average execution price
-        totalCost = tokensPurchased_ * (startingPrice + finalPrice) / 2; 
+        totalCost = tokensPurchased_ * ((startingPrice + finalPrice) / 2);
         newBasePrice = finalPrice;
     }
 
 
-    function purchase(uint256 tokensPurchased_, uint256 maxPrice_) external returns (uint256) {
+    function purchase(uint256 tokensPurchased_, uint256 maxPrice_) external {
 
         uint256 currentInventory = getCurrentInventory();
         (uint256 totalCost, uint256 newBasePrice) = getTotalCost(tokensPurchased_);
@@ -134,9 +135,7 @@ contract Bonds is Policy {
         // set the new base price after purchase
         basePrice = newBasePrice;
 
-        // return totalCost;  <=  currently used for testing, but should change tests now 
-
-        // TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
-        // VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
+        TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
+        VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
     }
 }

@@ -60,7 +60,8 @@ contract Bonds is Policy {
 
     uint256 public basePrice = 1_000_000; // the base price of the auction after the last sale, priced in 1/10,000th's of a cent (starts at $1.00)
     uint256 public prevSaleTimestamp; // the timestamp of the last purchase made at the bond
-    uint256 internal inventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
+    
+    uint256 internal prevInventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
 
 
     // Utility Functions.
@@ -83,7 +84,7 @@ contract Bonds is Policy {
         uint256 newEmissions = (block.timestamp - prevSaleTimestamp) * EMISSION_RATE / 1 days;
 
         // calculate the current inventory based on previous inventory and new emissions
-        currentInventory = _min(inventory + newEmissions, MAX_INVENTORY);
+        currentInventory = _min(prevInventory + newEmissions, MAX_INVENTORY);
     }
 
 
@@ -127,7 +128,7 @@ contract Bonds is Policy {
         if (totalCost > maxPrice_ * tokensPurchased_) { revert ExecutionPriceTooHigh(); }
 
         // save the new inventory after purchase
-        inventory = currentInventory - tokensPurchased_;
+        prevInventory = currentInventory - tokensPurchased_;
 
         // reset the purchase timestamp
         prevSaleTimestamp = block.timestamp;

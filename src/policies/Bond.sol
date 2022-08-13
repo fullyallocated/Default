@@ -66,7 +66,7 @@ contract Bond is Policy, IBond {
     uint256 public constant RESERVE_PRICE = 1_000_000; // lowest possible price for tokens to be sold in auction
 
     uint256 public basePrice = 1_000_000; // the base price of the auction after the last sale, priced in 1/10,000th's of a cent (starts at $1.00)
-    uint256 public prevSaleTimestamp; // the timestamp of the last purchase made at the bond
+    uint256 public prevSaleTimestamp = block.timestamp; // the timestamp of the last purchase made at the bond
     
     uint256 internal prevInventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
 
@@ -111,7 +111,7 @@ contract Bond is Policy, IBond {
         uint256 priceDecay = (block.timestamp - prevSaleTimestamp) * PRICE_DECAY_RATE / 1 days;
 
         // calculate starting price of current sale based on the last recorded base price and timestamp from the previous sale
-        uint256 startingPrice = _max(basePrice - priceDecay, RESERVE_PRICE);
+        uint256 startingPrice = basePrice > priceDecay ? _max(basePrice - priceDecay, RESERVE_PRICE) : RESERVE_PRICE;
 
         // final price of current sale including slippage from on tokens purchased
         uint256 finalPrice = startingPrice + (SLIPPAGE_RATE * tokensPurchased_);
@@ -142,9 +142,10 @@ contract Bond is Policy, IBond {
         // set the new base price after purchase
         basePrice = newBasePrice;
 
-        emit TokensPurchased(msg.sender, tokensPurchased_, totalCost);
+        // transfer dai from and mint VOTES to buyer
+        TRSRY.depositFrom(msg.sender, DAI, totalCost);
+        VOTES.mintTo(msg.sender, tokensPurchased_);
 
-        TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
-        VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
+        emit TokensPurchased(msg.sender, tokensPurchased_, totalCost);
     }
 }

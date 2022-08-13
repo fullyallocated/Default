@@ -5,7 +5,7 @@
 pragma solidity ^0.8.15;
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-import "src/Kernel.sol";
+import { Kernel, Module, Keycode } from "src/Kernel.sol";
 
 error VOTES_TransferDisabled();
 

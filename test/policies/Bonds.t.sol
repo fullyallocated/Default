@@ -2,11 +2,16 @@
 pragma solidity ^0.8.15;
 
 import { Test } from "forge-std/Test.sol";
+import { console2 } from "forge-std/console2.sol";
 import { UserFactory } from "test-utils/UserFactory.sol";
+
+import { MockERC20 } from "solmate/test/utils/mocks/MockERC20.sol";
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-import "src/Kernel.sol";
-import "src/modules/VOTES.sol";
-import "src/policies/Bond.sol";
+
+import { Kernel, Actions } from "src/Kernel.sol";
+import { DefaultVotes } from "src/modules/VOTES.sol";
+import { DefaultTreasury } from "src/modules/TRSRY.sol";
+import { Bonds } from "src/policies/Bonds.sol";
 
 contract MockDAI is ERC20("DAI", "DAI", 18) {
     
@@ -17,8 +22,12 @@ contract MockDAI is ERC20("DAI", "DAI", 18) {
 
 contract BondTest is Test, IBond {
     Kernel internal kernel;
+
+    MockERC20 internal DAI;
+
+    Bonds internal bonds;
     DefaultVotes internal VOTES;
-    Bond internal bond;
+    DefaultTreasury internal TRSRY;
 
     UserFactory public userFactory;
     address public user1;
@@ -36,22 +45,78 @@ contract BondTest is Test, IBond {
         user2 = users[1];
         user3 = users[2];
 
-        DAI = new MockDAI();
+        DAI = new MockERC20("DAI", "DAI", 18);
+        DAI.mint(user1, 1000*1e18);
+        DAI.mint(user2, 1000*1e18);
+        DAI.mint(user3, 1000*1e18);
 
+        // deploy default kernel
         kernel = new Kernel();
         VOTES = new DefaultVotes(kernel);
-        bond = new Bond(kernel, DAI); // <= create fake token addr
+        bonds = new Bonds(kernel, DAI);
+
+        // deploy treasury
+        ERC20[] memory approvedTokens = new ERC20[](2);
+        approvedTokens[0] = ERC20(DAI);
+        approvedTokens[1] = ERC20(VOTES);
+        TRSRY = new DefaultTreasury(kernel, approvedTokens);
+
+        // set up kernel
+        kernel.executeAction(Actions.InstallModule, address(VOTES));
+        kernel.executeAction(Actions.InstallModule, address(TRSRY));
+        kernel.executeAction(Actions.ApprovePolicy, address(bonds));
     }
 
     function testCorrectness_Initialize() public {
-        assertEq(bond.EMISSION_RATE(), 25000);
-        assertEq(bond.EMISSION_RATE(), 15);
-        assertEq(bond.PRICE_DECAY_RATE(), 187_500);
-        assertEq(bond.MAX_INVENTORY(), 1_000_000);
-        assertEq(bond.RESERVE_PRICE(), 1_000_000);
-        assertEq(bond.basePrice(), 1_000_000);
-        assertEq(bond.prevSaleTimestamp(), 0);
-        assertEq(bond.inventory(), 400_000);
+        assertEq(bonds.EMISSION_RATE(), 25000);
+        assertEq(bonds.PRICE_DECAY_RATE(), 187_500);
+        assertEq(bonds.MAX_INVENTORY(), 1_000_000);
+        assertEq(bonds.RESERVE_PRICE(), 1_000_000);
+        assertEq(bonds.basePrice(), 1_000_000);
+        assertEq(bonds.prevSaleTimestamp(), 0);
+        assertEq(bonds.getCurrentInventory(), 400_000);
+    }
+
+    function testCorrectness_PurchaseSingleBond() public {
+        vm.startPrank(user1);
+
+        // variants
+        uint256 amtToPurchase = 1;
+        (uint256 totalCost, ) = bonds.getTotalCost(amtToPurchase);
+        uint256 startingBalance = DAI.balanceOf(address(user1));
+
+        // purchase bond
+        DAI.approve(address(TRSRY), totalCost);
+        bonds.purchase(amtToPurchase, totalCost);
+
+        // assert that dai has been transfered
+        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost);
+
+        // assert that votes have been received
+        assertEq(VOTES.balanceOf(address(user1)), amtToPurchase);
+
+        vm.stopPrank();
+    }
+
+    function testCorrectness_PurchaseManyBonds() public {
+        vm.startPrank(user2);
+
+        // variants
+        uint256 amtToPurchase = 100;
+        (uint256 totalCost, ) = bonds.getTotalCost(amtToPurchase);
+        uint256 startingBalance = DAI.balanceOf(address(user1));
+
+        // purchase bond
+        DAI.approve(address(TRSRY), totalCost);
+        bonds.purchase(amtToPurchase, totalCost);
+
+        // assert dai has been transfered
+        assertEq(DAI.balanceOf(address(user2)), startingBalance - totalCost);
+
+        // assert that votes have been received
+        assertEq(VOTES.balanceOf(address(user2)), amtToPurchase);
+
+        vm.stopPrank();
     }
 
     // function testCorrectness_PurchaseSingleBatch() public {

@@ -5,7 +5,7 @@
 pragma solidity ^0.8.15;
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-import "src/Kernel.sol";
+import { Kernel, Module, Keycode } from "src/Kernel.sol";
 
 error IsAlreadyReserveAsset();
 error NotReserveAsset();
@@ -13,10 +13,14 @@ error NotReserveAsset();
 contract DefaultTreasury is Module {
 
     constructor(Kernel kernel_, ERC20[] memory initialAssets_) Module(kernel_) {
-        for (uint i; i < initialAssets_.length;) {
+        uint256 length = initialAssets_.length;
+        for (uint256 i; i < length;) {
             ERC20 asset = initialAssets_[i];
             isReserveAsset[asset] = true;
             reserveAssets.push(asset);
+            unchecked {
+                ++i;
+            }
         }   
     }
 

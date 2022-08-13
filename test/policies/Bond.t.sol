@@ -11,16 +11,9 @@ import { ERC20 } from "solmate/tokens/ERC20.sol";
 import { Kernel, Actions } from "src/Kernel.sol";
 import { DefaultVotes } from "src/modules/VOTES.sol";
 import { DefaultTreasury } from "src/modules/TRSRY.sol";
-import { Bonds } from "src/policies/Bonds.sol";
+import { Bond, IBond } from "src/policies/Bond.sol";
 
-contract MockDAI is ERC20("DAI", "DAI", 18) {
-    
-    function mint(address to_, uint256 amt_) public {
-        _mint(to_, amt_);
-    }
-}
-
-contract BondTest is Test, IBond {
+contract BondTest is Test {
     Kernel internal kernel;
 
     MockERC20 internal DAI;
@@ -33,8 +26,6 @@ contract BondTest is Test, IBond {
     address public user1;
     address public user2;
     address public user3;
-
-    ERC20 public DAI;    
 
     bytes public err;
 

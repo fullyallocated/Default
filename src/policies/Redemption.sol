@@ -2,9 +2,10 @@
 // Proxy Redemption is a contract that redeems votes for treasury assets
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-import "../modules/VOTES.sol";
-import "../modules/TRSRY.sol";
-import "../Kernel.sol";
+import { DefaultVotes } from "../modules/VOTES.sol";
+import { DefaultTreasury } from "../modules/TRSRY.sol";
+import { Kernel, Policy, Permissions, Keycode } from "../Kernel.sol";
+import { toKeycode } from "../utils/KernelUtils.sol";
 
 pragma solidity ^0.8.13;
 

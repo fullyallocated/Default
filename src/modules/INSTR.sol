@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.13;
 
-import "src/Kernel.sol";
+import { Kernel, Module, Keycode, Instruction, Actions } from "src/Kernel.sol";
 
 error INSTR_InstructionsCannotBeEmpty();
 error INSTR_InvalidChangeExecutorAction();

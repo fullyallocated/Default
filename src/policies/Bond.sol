@@ -2,9 +2,10 @@
 // Proxy Bonds are a modified gradual dutch auction mechanism for protocols to sell their native tokens.
 
 import { ERC20 } from "solmate/tokens/ERC20.sol";
-import "../modules/VOTES.sol";
-import "../modules/TRSRY.sol";
-import "../Kernel.sol";
+import { DefaultVotes } from "../modules/VOTES.sol";
+import { DefaultTreasury } from "../modules/TRSRY.sol";
+import { Kernel, Policy, Permissions, Keycode } from "../Kernel.sol";
+import { toKeycode } from "../utils/KernelUtils.sol";
 
 pragma solidity ^0.8.15;
 
@@ -34,7 +35,7 @@ contract Bond is Policy, IBond {
     }
 
     function configureDependencies() external override onlyKernel returns (Keycode[] memory dependencies) {
-        dependencies = new Keycode[](1);
+        dependencies = new Keycode[](2);
         
         dependencies[0] = toKeycode("VOTES");
         VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));
@@ -66,7 +67,8 @@ contract Bond is Policy, IBond {
 
     uint256 public basePrice = 1_000_000; // the base price of the auction after the last sale, priced in 1/10,000th's of a cent (starts at $1.00)
     uint256 public prevSaleTimestamp; // the timestamp of the last purchase made at the bond
-    uint256 public inventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
+    
+    uint256 internal prevInventory = 400_000; // the amount of tokens available for purchase in the auction (initially 400,000 PROX)
 
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +96,7 @@ contract Bond is Policy, IBond {
         uint256 newEmissions = (block.timestamp - prevSaleTimestamp) * EMISSION_RATE / 1 days;
 
         // calculate the current inventory based on previous inventory and new emissions
-        currentInventory = _min(inventory + newEmissions, MAX_INVENTORY);
+        currentInventory = _min(prevInventory + newEmissions, MAX_INVENTORY);
     }
 
 
@@ -115,12 +117,12 @@ contract Bond is Policy, IBond {
         uint256 finalPrice = startingPrice + (SLIPPAGE_RATE * tokensPurchased_);
 
         // get the average execution price
-        totalCost = tokensPurchased_ * (startingPrice + finalPrice) / 2; 
+        totalCost = tokensPurchased_ * ((startingPrice + finalPrice) / 2);
         newBasePrice = finalPrice;
     }
 
 
-    function purchase(uint256 tokensPurchased_, uint256 maxPrice_) external returns (uint256) {
+    function purchase(uint256 tokensPurchased_, uint256 maxPrice_) external {
 
         uint256 currentInventory = getCurrentInventory();
         (uint256 totalCost, uint256 newBasePrice) = getTotalCost(tokensPurchased_);
@@ -132,7 +134,7 @@ contract Bond is Policy, IBond {
         if (totalCost > maxPrice_ * tokensPurchased_) { revert ExecutionPriceTooHigh(); }
 
         // save the new inventory after purchase
-        inventory = currentInventory - tokensPurchased_;
+        prevInventory = currentInventory - tokensPurchased_;
 
         // reset the purchase timestamp
         prevSaleTimestamp = block.timestamp;
@@ -140,11 +142,9 @@ contract Bond is Policy, IBond {
         // set the new base price after purchase
         basePrice = newBasePrice;
 
-        // return totalCost;  <=  currently used for testing, but should change tests now 
+        emit TokensPurchased(msg.sender, tokensPurchased_, totalCost);
 
         TRSRY.depositFrom(msg.sender, DAI, totalCost); // <== TEST THIS, untested
-        VOTES.mintTo(msg.sender, tokensPurchased_ * 1e3); // <= TEST THIS, untested
-
-        emit TokensPurchased(msg.sender, tokensPurchased_, totalCost);
+        VOTES.mintTo(msg.sender, tokensPurchased_); // <= TEST THIS, untested
     }
 }

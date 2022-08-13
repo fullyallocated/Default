@@ -4,8 +4,16 @@
 
 pragma solidity ^0.8.15;
 
-import "../Kernel.sol";
-import { DefaultInstructions, Actions, Instruction } from "../modules/INSTR.sol";
+import {
+    Kernel,
+    Policy,
+    Instruction,
+    Keycode,
+    Actions,
+    Permissions
+} from "../Kernel.sol";
+import { toKeycode } from "../utils/KernelUtils.sol";
+import { DefaultInstructions } from "../modules/INSTR.sol";
 import { DefaultVotes } from "../modules/VOTES.sol";
 
 

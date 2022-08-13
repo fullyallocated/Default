@@ -4,7 +4,7 @@
 
 pragma solidity ^0.8.15;
 
-import "src/Kernel.sol";
+import { Kernel, Module, Keycode, Instruction, Actions } from "src/Kernel.sol";
 
 interface IDefaultInstructions {
 

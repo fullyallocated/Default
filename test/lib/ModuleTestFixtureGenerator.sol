@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: AGPL-3.0
 pragma solidity >=0.8.0;
 
-import {Quabi} from "./.quabi/Quabi.sol";
+import {Quabi} from "./quabi/Quabi.sol";
 import "src/Kernel.sol";
 
 /// @notice Mock policy to allow testing gated module functions

@@ -1,35 +1,40 @@
-// // SPDX-License-Identifier: UNLICENSED
-// pragma solidity ^0.8.15;
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.15;
 
-// import "forge-std/Script.sol";
-// import "../src/Kernel.sol";
-// import "../src/modules/INSTR.sol";
-// import "../src/modules/VOTES.sol";
-// import "../src/policies/Governance.sol";
-// import "../src/policies/VoteIssuer.sol";
+import "forge-std/Script.sol";
+import "../src/Kernel.sol";
+import "../src/modules/INSTR.sol";
+import "../src/modules/VOTES.sol";
+import "../src/policies/Governance.sol";
+import "../src/policies/VoteIssuer.sol";
 
 
-// contract DeployGovernance is Script {
-//     Kernel kernel;
-//     DefaultInstructions INSTR;
-//     DefaultVotes VOTES;
-//     Governance governance;
+contract DeployGovernance is Script {
+    Kernel kernel;
+    DefaultInstructions INSTR;
+    DefaultVotes VOTES;
+    Governance governance;
+    VoteIssuer voteIssuer;
 
-//     function run() external {
-//         vm.startBroadcast();
+    function run() external {
+        vm.startBroadcast();
 
-//         kernel = new Kernel();
+        kernel = new Kernel();
         
-//         INSTR = new DefaultInstructions(kernel);
-//         VOTES = new DefaultVotes(kernel);
+        INSTR = new DefaultInstructions(kernel);
+        VOTES = new DefaultVotes(kernel);
         
-//         governance = new Governance(kernel);
+        governance = new Governance(kernel);
+        voteIssuer = new VoteIssuer(kernel);
 
-//         kernel.executeAction(Actions.InstallModule, address(INSTR));
-//         kernel.executeAction(Actions.InstallModule, address(VOTES));
-//         kernel.executeAction(Actions.ApprovePolicy, address(governance));
-//         kernel.executeAction(Actions.ChangeExecutor, address(governance));
+        kernel.executeAction(Actions.InstallModule, address(INSTR));
+        kernel.executeAction(Actions.InstallModule, address(VOTES));
+        kernel.executeAction(Actions.ActivatePolicy, address(governance));
+        kernel.executeAction(Actions.ActivatePolicy, address(voteIssuer));
+        kernel.executeAction(Actions.ChangeExecutor, address(governance));
 
-//         vm.stopBroadcast();
-//     }
-// }
+        kernel.grantRole(Role.wrap("voteissuer"), 0x83D0f479732CC605225263F1AB7016309475aDd9);
+
+        vm.stopBroadcast();
+    }
+}

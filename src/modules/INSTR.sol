@@ -6,12 +6,18 @@ pragma solidity ^0.8.15;
 
 import "src/Kernel.sol";
 
-error INSTR_InstructionsCannotBeEmpty();
-error INSTR_InvalidChangeExecutorAction();
-error INSTR_InvalidTargetNotAContract();
-error INSTR_InvalidModuleKeycode();
+interface IDefaultInstructions {
 
-contract DefaultInstructions is Module {
+    event InstructionsStored(uint256 instructionsId);
+
+    error INSTR_InstructionsCannotBeEmpty();
+    error INSTR_InvalidChangeExecutorAction();
+    error INSTR_InvalidTargetNotAContract();
+    error INSTR_InvalidModuleKeycode();
+}
+
+
+contract DefaultInstructions is Module, IDefaultInstructions {
 
     /////////////////////////////////////////////////////////////////////////////////
     //                         Kernel Module Configuration                         //
@@ -26,8 +32,6 @@ contract DefaultInstructions is Module {
     /////////////////////////////////////////////////////////////////////////////////
     //                              Module Variables                               //
     /////////////////////////////////////////////////////////////////////////////////
-
-    event InstructionsStored(uint256 instructionsId);
 
     uint256 public totalInstructions;
     mapping(uint256 => Instruction[]) public storedInstructions;

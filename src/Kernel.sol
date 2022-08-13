@@ -35,8 +35,8 @@ error Kernel_RoleDoesNotExist(Role role_);
 enum Actions {
     InstallModule,
     UpgradeModule,
-    ApprovePolicy,
-    TerminatePolicy,
+    ActivatePolicy,
+    DeactivatePolicy,
     MigrateKernel,
     ChangeExecutor,
     ChangeAdmin
@@ -198,12 +198,12 @@ contract Kernel {
             ensureContract(target_);
             ensureValidKeycode(Module(target_).KEYCODE());
             _upgradeModule(Module(target_));
-        } else if (action_ == Actions.ApprovePolicy) {
+        } else if (action_ == Actions.ActivatePolicy) {
             ensureContract(target_);
-            _approvePolicy(Policy(target_));
-        } else if (action_ == Actions.TerminatePolicy) {
+            _ActivatePolicy(Policy(target_));
+        } else if (action_ == Actions.DeactivatePolicy) {
             ensureContract(target_);
-            _terminatePolicy(Policy(target_));
+            _DeactivatePolicy(Policy(target_));
         } else if (action_ == Actions.MigrateKernel) {
             ensureContract(target_);
             _migrateKernel(Kernel(target_));
@@ -247,7 +247,7 @@ contract Kernel {
         _reconfigurePolicies(keycode);
     }
 
-    function _approvePolicy(Policy policy_) internal {
+    function _ActivatePolicy(Policy policy_) internal {
         if (policy_.isActive()) revert Kernel_PolicyAlreadyApproved(address(policy_));
 
         // Grant permissions for policy to access restricted module functions
@@ -277,7 +277,7 @@ contract Kernel {
         policy_.setActiveStatus(true);
     }
 
-    function _terminatePolicy(Policy policy_) internal {
+    function _DeactivatePolicy(Policy policy_) internal {
         if (!policy_.isActive()) revert Kernel_PolicyNotApproved(address(policy_));
 
         // Revoke permissions

@@ -109,7 +109,7 @@ contract BondTest is Test, IBond {
         // assert base price has decayed to expected amount
         // add 1 slippage (.000015) to find the new base cost after price decay
         (totalCost, newBasePrice) = bond.getTotalCost(1);
-        assertEq(newBasePrice, 2310313 + bond.SLIPPAGE_RATE()); // TODO does this still make sense with 10,000 token per 1 slippage model?
+        assertEq(newBasePrice, 2310313 + bond.SLIPPAGE_RATE());
 
         // total cost should be the average of the prev basePrice (2310313) new basePrice (2310313 + 15)
         // so (2310313 + (2310313 + slippage)) / 2

@@ -1,9 +1,3 @@
 KernelTest:testGas_ApprovePolicy() (gas: 147023)
 KernelTest:testGas_CallPermissioned() (gas: 40619)
 KernelTest:testGas_CallPublic() (gas: 32705)
-
-
-
-RPC_URL=https://arb1.arbitrum.io/rpc
-CHAIN=42161
-ETHERSCAN_KEY=NPYP5HU92SMPBJQEMSQP3T2KRAXY431G1Z

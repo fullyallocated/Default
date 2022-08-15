@@ -130,6 +130,7 @@ contract Governance is Policy, IGovernance {
     uint256 public constant GRACE_PERIOD = 1 weeks; // amount of time an activated proposal can stay up before it can be replaced
     uint256 public constant ENDORSEMENT_THRESHOLD = 20; // required percentage of total supply to activate a proposal (in percentage)
     uint256 public constant EXECUTION_THRESHOLD = 33; // required net votes to execute a proposal (in percentage)
+    uint256 public constant EXECUTION_TIMELOCK = 10 minutes; // required time for a proposal to be active before it can be executed
     uint256 public constant VOTER_REWARD_RATE = 40;  // voter reward rate (in basis points)
 
 
@@ -276,8 +277,8 @@ contract Governance is Policy, IGovernance {
             revert NotEnoughVotesToExecute();
         }
 
-        // ensure three days have passed before the proposal can be executed
-        if (block.timestamp < activeProposal.activationTimestamp + 3 days) {
+        // ensure some time has passed before the proposal can be executed to prevent flashloan attacks
+        if (block.timestamp < activeProposal.activationTimestamp + EXECUTION_TIMELOCK) {
             revert ExecutionTimelockStillActive();
         }
 

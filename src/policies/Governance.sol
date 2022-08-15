@@ -2,6 +2,11 @@
 
 // The Governance Policy submits & activates instructions in a INSTR module
 
+// TODO:
+// Add governance bounty reward
+// Add governance participation reward
+// Add minimum vote threshold for activation
+
 pragma solidity ^0.8.15;
 
 import {

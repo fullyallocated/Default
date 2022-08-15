@@ -35,6 +35,8 @@ contract GovernanceTest is Test, IGovernance, IDefaultInstructions {
     address internal godmode;
 
     function setUp() public {
+        vm.warp(block.timestamp + 200 weeks);
+
         userCreator = new UserFactory();
 
         /// Create Voters
@@ -71,7 +73,6 @@ contract GovernanceTest is Test, IGovernance, IDefaultInstructions {
         // Change executor
         kernel.executeAction(Actions.ChangeExecutor, address(governance));
 
-
         // Mint tokens to users for testing
         vm.startPrank(godmode);
         VOTES.mintTo(voter1, 1);
@@ -98,6 +99,7 @@ contract GovernanceTest is Test, IGovernance, IDefaultInstructions {
     //    SUBMITTING PROPOSALS    //
     ////////////////////////////////
 
+
     function _submitProposal() internal {
         // create valid instructions
         Instruction[] memory instructions_ = new Instruction[](1);
@@ -107,6 +109,7 @@ contract GovernanceTest is Test, IGovernance, IDefaultInstructions {
         vm.prank(voter1);
         governance.submitProposal(instructions_, "proposalName", "This is the proposal URI");
     }
+
 
     function testRevert_NotEnoughVotesToPropose() public {
         Instruction[] memory instructions_ = new Instruction[](1);
@@ -119,417 +122,421 @@ contract GovernanceTest is Test, IGovernance, IDefaultInstructions {
         governance.submitProposal(instructions_, "proposalName", "This is the proposal URI");
     }
 
-    // function testEvent_ProposalSubmitted() public {
-    //     Instruction[] memory instructions_ = new Instruction[](1);
-    //     instructions_[0] = Instruction(Actions.ActivatePolicy, address(governance));
+    function testEvent_ProposalSubmitted() public {
+        Instruction[] memory instructions_ = new Instruction[](1);
+        instructions_[0] = Instruction(Actions.ActivatePolicy, address(governance));
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit ProposalSubmitted(1);
+        vm.expectEmit(true, true, true, true);
+        emit ProposalSubmitted(1);
 
-    //     vm.prank(voter1);
-    //     governance.submitProposal(instructions_, "proposalName", "This is the proposal URI");
-    // }
+        vm.prank(voter1);
+        governance.submitProposal(instructions_, "proposalName", "This is the proposal URI");
+    }
 
-    // function testCorrectness_SuccessfullySubmitProposal() public {
-    //     Instruction[] memory instructions_ = new Instruction[](1);
-    //     instructions_[0] = Instruction(Actions.ActivatePolicy, address(governance));
+    function testCorrectness_SuccessfullySubmitProposal() public {
+        Instruction[] memory instructions_ = new Instruction[](1);
+        instructions_[0] = Instruction(Actions.ActivatePolicy, address(governance));
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit InstructionsStored(1);
+        vm.expectEmit(true, true, true, true);
+        emit InstructionsStored(1);
 
-    //     vm.prank(voter1);
-    //     governance.submitProposal(instructions_, "proposalName", "This is the proposal URI");
+        vm.prank(voter1);
+        governance.submitProposal(instructions_, "proposalName", "This is the proposal URI");
 
-    //     // get the proposal metadata
-    //     ProposalMetadata memory pls = governance.getMetadata(1);
-    //     assertEq(pls.submissionTimestamp, 51 * 365 * 24 * 60 * 60);
-    //     assertEq(pls.title, "proposalName");
-    //     assertEq(pls.submitter, voter1);
-    //     assertEq(pls.proposalURI, "This is the proposal URI");
-    // }
+        // get the proposal metadata
+        ProposalMetadata memory pls = governance.getMetadata(1);
+        assertEq(pls.submissionTimestamp, block.timestamp);
+        assertEq(pls.title, "proposalName");
+        assertEq(pls.submitter, voter1);
+        assertEq(pls.proposalURI, "This is the proposal URI");
+    }
+
 
     // ////////////////////////////////
     // //     ENDORSING PROPOSALS    //
     // ////////////////////////////////
 
-    // function testRevert_CannotEndorseNullProposal() public {
-    //     vm.expectRevert(CannotEndorseNullProposal.selector);
 
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(0);
-    // }
+    function testRevert_CannotEndorseNullProposal() public {
+        vm.expectRevert(CannotEndorseNullProposal.selector);
 
-    // function testRevert_CannotEndorseInvalidProposal() public {
-    //     vm.expectRevert(CannotEndorseInvalidProposal.selector);
+        vm.prank(voter1);
+        governance.endorseProposal(0);
+    }
 
-    //     // endorse a proposal that doesn't exist
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(1);
-    // }
+    function testRevert_CannotEndorseInvalidProposal() public {
+        vm.expectRevert(CannotEndorseInvalidProposal.selector);
 
-    // function testEvent_ProposalEndorsed() public {
-    //     _submitProposal();
+        // endorse a proposal that doesn't exist
+        vm.prank(voter1);
+        governance.endorseProposal(1);
+    }
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit ProposalEndorsed(1, voter1, 1);
+    function testEvent_ProposalEndorsed() public {
+        _submitProposal();
 
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(1);
-    // }
+        vm.expectEmit(true, true, true, true);
+        emit ProposalEndorsed(1, voter1, 1);
 
-    // function testCorrectness_UserEndorsesProposal() public {
-    //     _submitProposal();
+        vm.prank(voter1);
+        governance.endorseProposal(1);
+    }
 
-    //     // endorse 1 vote as voter1
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(1);
+    function testCorrectness_UserEndorsesProposal() public {
+        _submitProposal();
 
-    //     // check that the contract state is updated correctly
-    //     assertEq(governance.userEndorsementsForProposal(1, voter1), 1);
-    //     assertEq(governance.totalEndorsementsForProposal(1), 1);
+        // endorse 1 vote as voter1
+        vm.prank(voter1);
+        governance.endorseProposal(1);
 
-    //     // endorse 2 votes as voter2
-    //     vm.prank(voter2);
-    //     governance.endorseProposal(1);
+        // check that the contract state is updated correctly
+        assertEq(governance.userEndorsementsForProposal(1, voter1), 1);
+        assertEq(governance.totalEndorsementsForProposal(1), 1);
 
-    //     // check that the contract state is updated conrrectly
-    //     assertEq(governance.totalEndorsementsForProposal(1), 3);
+        // endorse 2 votes as voter2
+        vm.prank(voter2);
+        governance.endorseProposal(1);
 
-    //     // issue 5 more votes to voter1
-    //     vm.prank(godmode);
-    //     VOTES.mintTo(voter1, 5);
+        // check that the contract state is updated conrrectly
+        assertEq(governance.totalEndorsementsForProposal(1), 3);
 
-    //     // reendorse proposal as voter1 with 6 total votes
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(1);
+        // issue 5 more votes to voter1
+        vm.prank(godmode);
+        VOTES.mintTo(voter1, 5);
 
-    //     // check that the contract state is updated conrrectly
-    //     assertEq(governance.userEndorsementsForProposal(1, voter1), 6);
-    //     assertEq(governance.totalEndorsementsForProposal(1), 8);
-    // }
+        // reendorse proposal as voter1 with 6 total votes
+        vm.prank(voter1);
+        governance.endorseProposal(1);
+
+        // check that the contract state is updated conrrectly
+        assertEq(governance.userEndorsementsForProposal(1, voter1), 6);
+        assertEq(governance.totalEndorsementsForProposal(1), 8);
+    }
+
 
     // ////////////////////////////////
     // //    ACTIVATING PROPOSALS    //
     // ////////////////////////////////
 
-    // function _createEndorsedProposal() public {
-    //     _submitProposal();
 
-    //     // give 3/15 endorsements to the submitted proposal (20%)
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(1);
+    function _createEndorsedProposal() public {
+        _submitProposal();
 
-    //     vm.prank(voter2);
-    //     governance.endorseProposal(1);
-    // }
+        // give 3/15 endorsements to the submitted proposal (20%)
+        vm.prank(voter1);
+        governance.endorseProposal(1);
 
-    // function testRevert_NotAuthorizedToActivateProposal() public {
-    //     _createEndorsedProposal();
+        vm.prank(voter2);
+        governance.endorseProposal(1);
+    }
 
-    //     vm.expectRevert(NotAuthorizedToActivateProposal.selector);
+    function testRevert_NotAuthorizedToActivateProposal() public {
+        _createEndorsedProposal();
 
-    //     // call function from not the proposer's wallet
-    //     vm.prank(voter2);
-    //     governance.activateProposal(1);
-    // }
+        vm.expectRevert(NotAuthorizedToActivateProposal.selector);
 
-    // function testRevert_SubmittedProposalHasExpired() public {
-    //     _submitProposal();
+        // call function from not the proposer's wallet
+        vm.prank(voter2);
+        governance.activateProposal(1);
+    }
 
-    //     // fast forward 2 weeks and 1 second
-    //     vm.warp(block.timestamp + 2 weeks + 1);
+    function testRevert_SubmittedProposalHasExpired() public {
+        _submitProposal();
 
-    //     vm.expectRevert(SubmittedProposalHasExpired.selector);
+        // fast forward 2 weeks and 1 second
+        vm.warp(block.timestamp + 2 weeks + 1);
 
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
-    // }
+        vm.expectRevert(SubmittedProposalHasExpired.selector);
 
-    // function testRevert_NotEnoughEndorsementsToActivateProposal() public {
-    //     _submitProposal();
+        vm.prank(voter1);
+        governance.activateProposal(1);
+    }
 
-    //     // give the proposal 2/3 necessary endorsements
-    //     vm.prank(voter2);
-    //     governance.endorseProposal(1);
+    function testRevert_NotEnoughEndorsementsToActivateProposal() public {
+        _submitProposal();
 
-    //     vm.expectRevert(NotEnoughEndorsementsToActivateProposal.selector);
+        // give the proposal 2/3 necessary endorsements
+        vm.prank(voter2);
+        governance.endorseProposal(1);
 
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
-    // }
+        vm.expectRevert(NotEnoughEndorsementsToActivateProposal.selector);
 
-    // function testRevert_ProposalAlreadyActivated() public {
-    //     _createEndorsedProposal();
+        vm.prank(voter1);
+        governance.activateProposal(1);
+    }
 
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
+    function testRevert_ProposalAlreadyActivated() public {
+        _createEndorsedProposal();
 
-    //     vm.expectRevert(ProposalAlreadyActivated.selector);
+        vm.prank(voter1);
+        governance.activateProposal(1);
 
-    //     // activate the proposal again
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
-    // }
+        vm.expectRevert(ProposalAlreadyActivated.selector);
 
-    // function testRevert_ActiveProposalNotExpired() public {
-    //     _createEndorsedProposal();
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
+        // activate the proposal again
+        vm.prank(voter1);
+        governance.activateProposal(1);
+    }
 
-    //     // submit & endorse a second proposal
-    //     _submitProposal();
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(2);
-    //     vm.prank(voter2);
-    //     governance.endorseProposal(2);
+    function testRevert_ActiveProposalNotExpired() public {
+        _createEndorsedProposal();
+        vm.prank(voter1);
+        governance.activateProposal(1);
 
-    //     vm.expectRevert(ActiveProposalNotExpired.selector);
+        // submit & endorse a second proposal
+        _submitProposal();
+        vm.prank(voter1);
+        governance.endorseProposal(2);
+        vm.prank(voter2);
+        governance.endorseProposal(2);
 
-    //     // try to activate the second proposal
-    //     vm.prank(voter1);
-    //     governance.activateProposal(2);
-    // }
+        vm.expectRevert(ActiveProposalNotExpired.selector);
 
-    // function testEvent_ProposalActivated() public {
-    //     _createEndorsedProposal();
+        // try to activate the second proposal
+        vm.prank(voter1);
+        governance.activateProposal(2);
+    }
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit ProposalActivated(1, block.timestamp);
+    function testEvent_ProposalActivated() public {
+        _createEndorsedProposal();
 
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
-    // }
+        vm.expectEmit(true, true, true, true);
+        emit ProposalActivated(1, block.timestamp);
 
-    // function testCorrectness_ProposerActivatesSubmittedProposal() public {
-    //     _createEndorsedProposal();
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
+        vm.prank(voter1);
+        governance.activateProposal(1);
+    }
 
-    //     // check that the active proposal data is correct
-    //     ActivatedProposal memory activeProposal = governance.getActiveProposal();
+    function testCorrectness_ProposerActivatesSubmittedProposal() public {
+        _createEndorsedProposal();
+        vm.prank(voter1);
+        governance.activateProposal(1);
 
-    //     assertEq(activeProposal.proposalId, 1);
-    //     assertEq(activeProposal.activationTimestamp, block.timestamp);
-    //     assertTrue(governance.proposalHasBeenActivated(1));
+        // check that the active proposal data is correct
+        ActivatedProposal memory activeProposal = governance.getActiveProposal();
 
-    //     // submit another valid proposal and endorse it to 20% (3/15 total votes)
-    //     _submitProposal();
-    //     vm.prank(voter1);
-    //     governance.endorseProposal(2);
-    //     vm.prank(voter2);
-    //     governance.endorseProposal(2);
+        assertEq(activeProposal.proposalId, 1);
+        assertEq(activeProposal.activationTimestamp, block.timestamp);
+        assertTrue(governance.proposalHasBeenActivated(1));
 
-    //     // expire the first proposal by moving forward 1 week + 1 second
-    //     vm.warp(block.timestamp + 1 weeks + 1);
+        // submit another valid proposal and endorse it to 20% (3/15 total votes)
+        _submitProposal();
+        vm.prank(voter1);
+        governance.endorseProposal(2);
+        vm.prank(voter2);
+        governance.endorseProposal(2);
 
-    //     // activate the second proposal
-    //     vm.prank(voter1);
-    //     governance.activateProposal(2);
+        // expire the first proposal by moving forward 1 week + 1 second
+        vm.warp(block.timestamp + 1 weeks + 3);
 
-    //     // check that the new proposal has been activated
-    //     activeProposal = governance.getActiveProposal();
+        // activate the second proposal
+        vm.prank(voter1);
+        governance.activateProposal(2);
 
-    //     assertEq(activeProposal.proposalId, 2);
-    //     assertTrue(governance.proposalHasBeenActivated(2));
-    // }
+        // check that the new proposal has been activated
+        activeProposal = governance.getActiveProposal();
 
-    // ////////////////////////////////
-    // //    VOTING ON EXECTUTION    //
-    // ////////////////////////////////
+        assertEq(activeProposal.proposalId, 2);
+        assertTrue(governance.proposalHasBeenActivated(2));
+    }
 
-    // function _createActiveProposal() public {
-    //     _createEndorsedProposal();
-    //     vm.prank(voter1);
-    //     governance.activateProposal(1);
-    // }
+    ////////////////////////////////
+    //    VOTING ON EXECTUTION    //
+    ////////////////////////////////
 
-    // function testRevert_NoActiveProposalDetected() public {
-    //     vm.expectRevert(NoActiveProposalDetected.selector);
+    function _createActiveProposal() public {
+        _createEndorsedProposal();
+        vm.prank(voter1);
+        governance.activateProposal(1);
+    }
 
-    //     vm.prank(voter1);
-    //     governance.vote(true);
-    // }
+    function testRevert_NoActiveProposalDetected() public {
+        vm.expectRevert(NoActiveProposalDetected.selector);
 
-    // function testRevert_UserAlreadyVoted() public {
-    //     _createActiveProposal();
+        vm.prank(voter1);
+        governance.vote(true);
+    }
 
-    //     vm.prank(voter1);
-    //     governance.vote(true);
+    function testRevert_UserAlreadyVoted() public {
+        _createActiveProposal();
 
-    //     vm.expectRevert(UserAlreadyVoted.selector);
+        vm.prank(voter1);
+        governance.vote(true);
 
-    //     // try to vote again
-    //     vm.prank(voter1);
-    //     governance.vote(true);
-    // }
+        vm.expectRevert(UserAlreadyVoted.selector);
 
-    // function testEvent_WalletVoted() public {
-    //     _createActiveProposal();
+        // try to vote again
+        vm.prank(voter1);
+        governance.vote(true);
+    }
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit WalletVoted(1, voter1, false, 1);
+    function testEvent_WalletVoted() public {
+        _createActiveProposal();
 
-    //     vm.prank(voter1);
-    //     governance.vote(false);
-    // }
+        vm.expectEmit(true, true, true, true);
+        emit WalletVoted(1, voter1, false, 1);
 
-    // function testCorrectness_UserVotesForProposal() public {
-    //     _createActiveProposal();
+        vm.prank(voter1);
+        governance.vote(false);
+    }
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit Transfer(voter1, address(governance), 1);
+    function testCorrectness_UserVotesForProposal() public {
+        _createActiveProposal();
 
-    //     vm.prank(voter1);
-    //     governance.vote(true);
+        // vm.expectEmit(true, true, true, true);
+        // emit Transfer(voter1, address(governance), 1);
 
-    //     // check voting state
-    //     assertEq(governance.userVotesForProposal(1, voter1), 1);
-    //     assertEq(governance.yesVotesForProposal(1), 1);
+        vm.prank(voter1);
+        governance.vote(true);
 
-    //     // test token transfer
-    //     assertEq(VOTES.balanceOf(address(voter1)), 0);
-    //     assertEq(VOTES.balanceOf(address(governance)), 1);
+        // check voting state
+        assertEq(governance.userVotesForProposal(1, voter1), 1);
+        assertEq(governance.yesVotesForProposal(1), 1);
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit Transfer(voter2, address(governance), 2);
+        // // test token transfer
+        assertEq(VOTES.balanceOf(address(voter1)), 0);
+        assertEq(VOTES.balanceOf(address(governance)), 1);
 
-    //     vm.prank(voter2);
-    //     governance.vote(false);
+        // vm.expectEmit(true, true, true, true);
+        // emit Transfer(voter2, address(governance), 2);
 
-    //     // check voting state
-    //     assertEq(governance.userVotesForProposal(1, voter2), 2);
-    //     assertEq(governance.noVotesForProposal(1), 2);
+        vm.prank(voter2);
+        governance.vote(false);
 
-    //     // test token transfer
-    //     assertEq(VOTES.balanceOf(address(voter2)), 0);
-    //     assertEq(VOTES.balanceOf(address(governance)), 3);
-    // }
+        // check voting state
+        assertEq(governance.userVotesForProposal(1, voter2), 2);
+        assertEq(governance.noVotesForProposal(1), 2);
 
-    // ////////////////////////////////
-    // //   EXECUTING INSTRUCTIONS   //
-    // ////////////////////////////////
+        // test token transfer
+        assertEq(VOTES.balanceOf(address(voter2)), 0);
+        assertEq(VOTES.balanceOf(address(governance)), 3);
+    }
 
-    // function _createApprovedInstructions() public {
-    //     _createActiveProposal();
-    //     vm.prank(voter5);
-    //     governance.vote(true);
-    // }
+    ////////////////////////////////
+    //   EXECUTING INSTRUCTIONS   //
+    ////////////////////////////////
 
-    // function testRevert_NotEnoughVotesToExecute() public {
-    //     // submit, endorse, and activate a proposal
-    //     _createActiveProposal();
+    function _createApprovedInstructions() public {
+        _createActiveProposal();
+        vm.prank(voter5);
+        governance.vote(true);
+    }
 
-    //     // cast 4 net votes for the proposal (5 needed)
-    //     vm.prank(voter4);
-    //     governance.vote(true);
+    function testRevert_NotEnoughVotesToExecute() public {
+        // submit, endorse, and activate a proposal
+        _createActiveProposal();
 
-    //     vm.prank(voter3);
-    //     governance.vote(true);
+        // cast 4 net votes for the proposal (5 needed)
+        vm.prank(voter4);
+        governance.vote(true);
 
-    //     vm.prank(voter2);
-    //     governance.vote(false);
+        vm.prank(voter3);
+        governance.vote(true);
 
-    //     vm.prank(voter1);
-    //     governance.vote(false);
+        vm.prank(voter2);
+        governance.vote(false);
 
-    //     vm.expectRevert(NotEnoughVotesToExecute.selector);
-    //     governance.executeProposal();
-    // }
+        vm.prank(voter1);
+        governance.vote(false);
 
-    // function testRevert_ExecutionTimelockStillActive() public {
-    //     _createApprovedInstructions();
+        vm.expectRevert(NotEnoughVotesToExecute.selector);
+        governance.executeProposal();
+    }
 
-    //     vm.expectRevert(ExecutionTimelockStillActive.selector);
-    //     governance.executeProposal();
-    // }
+    function testRevert_ExecutionTimelockStillActive() public {
+        _createApprovedInstructions();
 
-    // function testEvent_ProposalExecuted() public {
-    //     _createApprovedInstructions();
+        vm.expectRevert(ExecutionTimelockStillActive.selector);
+        governance.executeProposal();
+    }
 
-    //     // move 3 days + 1 second into the future
-    //     vm.warp(block.timestamp + 3 days + 1);
+    function testEvent_ProposalExecuted() public {
+        _createApprovedInstructions();
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit ProposalExecuted(1);
+        // move 3 days + 1 second into the future
+        vm.warp(block.timestamp + 3 days + 1);
 
-    //     governance.executeProposal();
-    // }
+        vm.expectEmit(true, true, true, true);
+        emit ProposalExecuted(1);
 
-    // function testCorrectness_executeInstructions() public {
-    //     _createApprovedInstructions();
+        governance.executeProposal();
+    }
 
-    //     // move 3 days + 1 second into the future
-    //     vm.warp(block.timestamp + 3 days + 1);
+    function testCorrectness_executeInstructions() public {
+        _createApprovedInstructions();
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit ProposalExecuted(1);
+        // move 3 days + 1 second into the future
+        vm.warp(block.timestamp + 3 days + 1);
 
-    //     governance.executeProposal();
+        vm.expectEmit(true, true, true, true);
+        emit ProposalExecuted(1);
 
-    //     // check that the proposal is no longer active
-    //     ActivatedProposal memory activeProposal = governance.getActiveProposal();
+        governance.executeProposal();
 
-    //     assertEq(activeProposal.proposalId, 0);
-    //     assertEq(activeProposal.activationTimestamp, 0);
+        // check that the proposal is no longer active
+        ActivatedProposal memory activeProposal = governance.getActiveProposal();
 
-    //     // check that the proposed contracts are approved in the kernel
-    //     assertTrue(Policy(newProposedPolicy).isActive());
-    // }
+        assertEq(activeProposal.proposalId, 0);
+        assertEq(activeProposal.activationTimestamp, 0);
 
-    // ////////////////////////////////
-    // //   RECLAIMING VOTE TOKENS   //
-    // ////////////////////////////////
+        // check that the proposed contracts are approved in the kernel
+        assertTrue(Policy(newProposedPolicy).isActive());
+    }
 
-    // function _executeProposal() public {
-    //     _createApprovedInstructions();
-    //     vm.warp(block.timestamp + 3 days + 1);
-    //     governance.executeProposal();
-    //     assertEq(VOTES.balanceOf(voter5), 0);
-    // }
+    ////////////////////////////////
+    //   RECLAIMING VOTE TOKENS   //
+    ////////////////////////////////
 
-    // function testRevert_CannotReclaimZeroVotes() public {
-    //     _executeProposal();
-    //     vm.expectRevert(CannotReclaimZeroVotes.selector);
+    function _executeProposal() public {
+        _createApprovedInstructions();
+        vm.warp(block.timestamp + 3 days + 1);
+        governance.executeProposal();
+        assertEq(VOTES.balanceOf(voter5), 0);
+    }
 
-    //     vm.prank(voter4);
-    //     governance.reclaimVotes(1);
-    // }
+    function testRevert_CannotReclaimZeroVotes() public {
+        _executeProposal();
+        vm.expectRevert(CannotReclaimZeroVotes.selector);
 
-    // function testRevert_CannotReclaimTokensForActiveVote() public {
-    //     _createApprovedInstructions();
+        vm.prank(voter4);
+        governance.reclaimVotes(1);
+    }
 
-    //     vm.expectRevert(CannotReclaimTokensForActiveVote.selector);
+    function testRevert_CannotReclaimTokensForActiveVote() public {
+        _createApprovedInstructions();
 
-    //     vm.prank(voter5);
-    //     governance.reclaimVotes(1);
-    // }
+        vm.expectRevert(CannotReclaimTokensForActiveVote.selector);
 
-    // function testRevert_VotingTokensAlreadyReclaimed() public {
-    //     _executeProposal();
+        vm.prank(voter5);
+        governance.reclaimVotes(1);
+    }
 
-    //     vm.prank(voter5);
-    //     governance.reclaimVotes(1);
+    function testRevert_VotingTokensAlreadyReclaimed() public {
+        _executeProposal();
 
-    //     vm.expectRevert(VotingTokensAlreadyReclaimed.selector);
+        vm.prank(voter5);
+        governance.reclaimVotes(1);
 
-    //     vm.prank(voter5);
-    //     governance.reclaimVotes(1);
-    // }
+        vm.expectRevert(VotingTokensAlreadyReclaimed.selector);
 
-    // function testCorrectness_SuccessfullyReclaimVotes() public {
-    //     _executeProposal();
+        vm.prank(voter5);
+        governance.reclaimVotes(1);
+    }
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit Transfer(address(governance), voter5, 5);
+    function testCorrectness_SuccessfullyReclaimVotes() public {
+        _executeProposal();
 
-    //     vm.prank(voter5);
-    //     governance.reclaimVotes(1);
+        // vm.expectEmit(true, true, true, true);
+        // emit Transfer(address(governance), voter5, 5);
 
-    //     // check that the claim has been recorded
-    //     assertTrue(governance.tokenClaimsForProposal(1, voter5));
+        vm.prank(voter5);
+        governance.reclaimVotes(1);
 
-    //     // check that the voting tokens are successfully returned to the user from the contract
-    //     assertEq(VOTES.balanceOf(voter5), 5);
-    //     assertEq(VOTES.balanceOf(address(governance)), 0);
-    // }
+        // check that the claim has been recorded
+        assertTrue(governance.tokenClaimsForProposal(1, voter5));
+
+        // check that the voting tokens are successfully returned to the user from the contract
+        assertEq(VOTES.balanceOf(voter5), 5);
+        assertEq(VOTES.balanceOf(address(governance)), 0);
+    }
 }

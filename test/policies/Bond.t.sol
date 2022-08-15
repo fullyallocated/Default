@@ -56,7 +56,7 @@ contract BondTest is Test, IBond {
         // set up kernel
         kernel.executeAction(Actions.InstallModule, address(VOTES));
         kernel.executeAction(Actions.InstallModule, address(TRSRY));
-        kernel.executeAction(Actions.ApprovePolicy, address(bond));
+        kernel.executeAction(Actions.ActivatePolicy, address(bond));
     }
 
     function testCorrectness_Initialize() public {

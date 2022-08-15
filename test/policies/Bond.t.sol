@@ -85,7 +85,10 @@ contract BondTest is Test, IBond {
         assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost);
 
         // assert that votes have been received
-        assertEq(VOTES.balanceOf(address(user1)), amtToPurchase);
+        assertEq(
+            VOTES.balanceOf(address(user1)),
+            amtToPurchase*10**VOTES.decimals()
+        );
 
         vm.stopPrank();
     }
@@ -94,7 +97,10 @@ contract BondTest is Test, IBond {
         vm.startPrank(user2);
 
         uint256 amtToPurchase1 = 128_500;
-        (uint256 totalCost, uint256 newBasePrice) = bond.getTotalCost(amtToPurchase1);
+        (
+            uint256 totalCost,
+            uint256 newBasePrice
+        ) = bond.getTotalCost(amtToPurchase1);
         
         // purchase 128500 tokens
         // so if slippage is 15 then
@@ -126,7 +132,10 @@ contract BondTest is Test, IBond {
         vm.warp(block.timestamp + 5 days);
 
         // assert that inventory is inflated at expected rate
-        assertEq(bond.getCurrentInventory(), 400_000 + (bond.EMISSION_RATE() * 5));
+        assertEq(
+            bond.getCurrentInventory(),
+            400_000 + (bond.EMISSION_RATE() * 5)
+        );
 
     }
 
@@ -190,6 +199,8 @@ contract BondTest is Test, IBond {
     function testCorrectness_PurchaseMultiple() public {
         vm.startPrank(user1);
 
+        uint256 decimals = VOTES.decimals();
+
         uint256 startingBalance = DAI.balanceOf(address(user1));
 
         uint256 amtToPurchase1 = 50_000;
@@ -203,7 +214,10 @@ contract BondTest is Test, IBond {
         assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost1);
 
         // assert that votes have been received
-        assertEq(VOTES.balanceOf(address(user1)), amtToPurchase1);
+        assertEq(
+            VOTES.balanceOf(address(user1)),
+            amtToPurchase1 * 10**decimals
+        );
 
         vm.warp(block.timestamp + 1 days);
 
@@ -215,10 +229,16 @@ contract BondTest is Test, IBond {
         bond.purchase(amtToPurchase2, totalCost2);
 
         // assert dai has been transfered
-        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost1 - totalCost2);
+        assertEq(
+            DAI.balanceOf(address(user1)),
+            startingBalance - totalCost1 - totalCost2
+        );
 
         // assert that votes have been received
-        assertEq(VOTES.balanceOf(address(user1)), amtToPurchase1 + amtToPurchase2);
+        assertEq(
+            VOTES.balanceOf(address(user1)),
+            (amtToPurchase1 + amtToPurchase2) * 10**decimals
+        );
 
         vm.warp(block.timestamp + 2 days);
 
@@ -230,10 +250,16 @@ contract BondTest is Test, IBond {
         bond.purchase(amtToPurchase3, totalCost3);
 
         // assert dai has been transfered
-        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost1 - totalCost2 - totalCost3);
+        assertEq(
+            DAI.balanceOf(address(user1)),
+            startingBalance - totalCost1 - totalCost2 - totalCost3
+        );
 
         // assert that votes have been received
-        assertEq(VOTES.balanceOf(address(user1)), amtToPurchase1 + amtToPurchase2 + amtToPurchase3);
+        assertEq(
+            VOTES.balanceOf(address(user1)),
+            (amtToPurchase1 + amtToPurchase2 + amtToPurchase3) * 10**decimals
+        );
 
         vm.stopPrank();
 

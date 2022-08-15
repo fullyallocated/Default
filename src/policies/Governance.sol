@@ -131,7 +131,8 @@ contract Governance is Policy, IGovernance {
     uint256 public constant ENDORSEMENT_THRESHOLD = 20; // required percentage of total supply to activate a proposal (in percentage)
     uint256 public constant EXECUTION_THRESHOLD = 33; // required net votes to execute a proposal (in percentage)
     uint256 public constant EXECUTION_TIMELOCK = 10 minutes; // required time for a proposal to be active before it can be executed
-    uint256 public constant VOTER_REWARD_RATE = 40;  // voter reward rate (in basis points)
+    uint256 public constant GOVERNANCE_BOUNTY = 0;  // sucessful proposal reward rate (in basis points)
+    uint256 public constant VOTER_REWARD_RATE = 0;  // voter reward rate (in basis points)
 
 
     /////////////////////////////////////////////////////////////////////////////////
@@ -292,7 +293,7 @@ contract Governance is Policy, IGovernance {
 
         // reward the proposer with 2% of the token supply
         address proposer = getProposalMetadata[activeProposal.proposalId].submitter;
-        VOTES.mintTo(proposer, VOTES.totalSupply() * 2 / 100);
+        VOTES.mintTo(proposer, VOTES.totalSupply() * GOVERNANCE_BOUNTY / 10000);
 
         // emit the corresponding event
         emit ProposalExecuted(activeProposal.proposalId);

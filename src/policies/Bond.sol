@@ -144,7 +144,7 @@ contract Bond is Policy, IBond {
 
         // transfer dai from and mint VOTES to buyer
         TRSRY.depositFrom(msg.sender, DAI, totalCost);
-        VOTES.mintTo(msg.sender, tokensPurchased_);
+        VOTES.mintTo(msg.sender, tokensPurchased_ * 1e3);
 
         emit TokensPurchased(msg.sender, tokensPurchased_, totalCost);
     }

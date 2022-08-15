@@ -37,9 +37,9 @@ enum Actions {
     UpgradeModule,
     ActivatePolicy,
     DeactivatePolicy,
-    MigrateKernel,
     ChangeExecutor,
-    ChangeAdmin
+    ChangeAdmin,
+    MigrateKernel
 }
 
 struct Instruction {
@@ -200,10 +200,10 @@ contract Kernel {
             _upgradeModule(Module(target_));
         } else if (action_ == Actions.ActivatePolicy) {
             ensureContract(target_);
-            _ActivatePolicy(Policy(target_));
+            _activatePolicy(Policy(target_));
         } else if (action_ == Actions.DeactivatePolicy) {
             ensureContract(target_);
-            _DeactivatePolicy(Policy(target_));
+            _deactivatePolicy(Policy(target_));
         } else if (action_ == Actions.MigrateKernel) {
             ensureContract(target_);
             _migrateKernel(Kernel(target_));
@@ -247,7 +247,7 @@ contract Kernel {
         _reconfigurePolicies(keycode);
     }
 
-    function _ActivatePolicy(Policy policy_) internal {
+    function _activatePolicy(Policy policy_) internal {
         if (policy_.isActive()) revert Kernel_PolicyAlreadyApproved(address(policy_));
 
         // Grant permissions for policy to access restricted module functions
@@ -277,7 +277,7 @@ contract Kernel {
         policy_.setActiveStatus(true);
     }
 
-    function _DeactivatePolicy(Policy policy_) internal {
+    function _deactivatePolicy(Policy policy_) internal {
         if (!policy_.isActive()) revert Kernel_PolicyNotApproved(address(policy_));
 
         // Revoke permissions

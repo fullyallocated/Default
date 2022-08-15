@@ -13,8 +13,9 @@ contract DeployGovernance is Script {
     Kernel kernel;
     DefaultInstructions INSTR;
     DefaultVotes VOTES;
+    DefaultTreasury TRSRY;
     Governance governance;
-    VoteIssuer voteIssuer;
+    Bond bond;
 
     function run() external {
         vm.startBroadcast();

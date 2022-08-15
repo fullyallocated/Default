@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 // Proxy Redemption is a contract that redeems votes for treasury assets
 
+pragma solidity ^0.8.15;
+
 import { ERC20 } from "solmate/tokens/ERC20.sol";
 import { DefaultVotes } from "../modules/VOTES.sol";
 import { DefaultTreasury } from "../modules/TRSRY.sol";
 import { Kernel, Policy, Permissions, Keycode } from "../Kernel.sol";
 import { toKeycode } from "../utils/KernelUtils.sol";
 
-pragma solidity ^0.8.15;
 
 
 interface IRedemption {
@@ -31,7 +32,7 @@ contract Redemption is Policy, IRedemption {
     constructor(Kernel kernel_) Policy(kernel_) {}
 
     function configureDependencies() external override onlyKernel returns (Keycode[] memory dependencies) {
-        dependencies = new Keycode[](1);
+        dependencies = new Keycode[](2);
         
         dependencies[0] = toKeycode("VOTES");
         VOTES = DefaultVotes(getModuleAddress(toKeycode("VOTES")));

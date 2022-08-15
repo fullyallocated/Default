@@ -17,6 +17,8 @@ contract DeployGovernance is Script {
     Governance governance;
     Bond bond;
 
+    ERC20 constant DAI = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
+
     function run() external {
         vm.startBroadcast();
 
@@ -24,17 +26,21 @@ contract DeployGovernance is Script {
         
         INSTR = new DefaultInstructions(kernel);
         VOTES = new DefaultVotes(kernel);
+        TRSRY = new DefaultTreasury(kernel, DAI);
         
         governance = new Governance(kernel);
         voteIssuer = new VoteIssuer(kernel);
 
         kernel.executeAction(Actions.InstallModule, address(INSTR));
         kernel.executeAction(Actions.InstallModule, address(VOTES));
+        kernel.executeAction(Actions.InstallModule, address(TRSRY));
+
         kernel.executeAction(Actions.ActivatePolicy, address(governance));
-        kernel.executeAction(Actions.ActivatePolicy, address(voteIssuer));
+        kernel.executeAction(Actions.ActivatePolicy, address(bond));
+
+        kernel.executeAction(Actions.ChangeAdmin, address(0));
         kernel.executeAction(Actions.ChangeExecutor, address(governance));
 
-        kernel.grantRole(Role.wrap("voteissuer"), 0x83D0f479732CC605225263F1AB7016309475aDd9);
 
         vm.stopBroadcast();
     }

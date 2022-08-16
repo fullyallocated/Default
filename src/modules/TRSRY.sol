@@ -58,6 +58,7 @@ contract DefaultTreasury is Module {
         for (uint256 i; i < numAssets; ) {
             if (reserveAssets[i] == asset_) {
                 reserveAssets[i] = reserveAssets[numAssets - 1];
+                reserveAssets.pop();
                 break;
             }
             unchecked {

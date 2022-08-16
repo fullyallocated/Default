@@ -47,7 +47,7 @@ contract DumbassRescueScript is Policy {
         ERC20 dai = ERC20(DAI_ADDR);
         uint256 daiBalance = dai.balanceOf(address(TRSRY));
 
-        TRSRY.withdraw(DAI_ADDR, daiBalance);
+        TRSRY.withdraw(ERC20(DAI_ADDR), daiBalance);
         dai.transfer(FULLY_ADDR, daiBalance);
     }
 }

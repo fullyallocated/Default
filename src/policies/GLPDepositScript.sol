@@ -31,9 +31,10 @@ contract GLPDepositScript is Policy {
     ITRSRY public TRSRY;
 
     // arbitrum addresses
-    address public constant DAI_ADDR = 0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1;
-    address public constant SGLP_ADDR = 0x2F546AD4eDD93B956C8999Be404cdCAFde3E89AE;
-    IGmxRewardRouter public constant GMX_REWARD_ROUTER = 0xA906F338CB21815cBc4Bc87ace9e68c87eF8d8F1;
+    ERC20 public constant DAI = ERC20(0xDA10009cBd5D07dd0CeCc66161FC93D7c9000da1);
+    ERC20 public constant SGLP = ERC20(0x2F546AD4eDD93B956C8999Be404cdCAFde3E89AE);
+    IGmxRewardRouter public constant GMX_REWARD_ROUTER =
+        IGmxRewardRouter(0xA906F338CB21815cBc4Bc87ace9e68c87eF8d8F1);
 
     // Execution vars
     // TODO needs to be adjusted to actual amount
@@ -69,7 +70,7 @@ contract GLPDepositScript is Policy {
 
     // Deposits DAI into GLP then stakes into gauge, then sends sGLP back to treasury
     function run() external {
-        TRSRY.withdraw(DAI_ADDR, depositAmount);
+        TRSRY.withdraw(DAI, depositAmount);
 
         // 1000_0000 * 98_00
         // 2% slippage
@@ -77,16 +78,16 @@ contract GLPDepositScript is Policy {
         uint256 minGlp = 0; // don't want to deal with glp pricing
 
         // USDG has same decimals as DAI, so can use same depositAmount value
-        uint256 sGlpAmount = GMX_REWARD_ROUTER.mintAndStakeLp(
-            DAI_ADDR,
+        uint256 sGlpAmount = GMX_REWARD_ROUTER.mintAndStakeGlp(
+            address(DAI),
             depositAmount,
             minUsd,
             minGlp
         );
 
         // Deposit sGLP into treasury
-        TRSRY.depositFrom(address(this), SGLP_ADDR, sGlpAmount);
+        TRSRY.depositFrom(address(this), SGLP, sGlpAmount);
 
-        emit GLPDeposited(depositToken_, amount_);
+        emit GLPDeposited(DAI, depositAmount);
     }
 }

@@ -146,6 +146,6 @@ contract Bond is Policy, IBond {
         TRSRY.depositFrom(msg.sender, DAI, totalCost * 1e12); // total DAI = totalCost * 1e18 (decimals) / 1e6 (10,000th's of a cent), in dollars
         VOTES.mintTo(msg.sender, tokensPurchased_ * 1e3);
 
-        emit TokensPurchased(msg.sender, tokensPurchased_, totalCost);
+        emit TokensPurchased(msg.sender, tokensPurchased_, totalCost / 1e4);
     }
 }

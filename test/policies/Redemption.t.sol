@@ -142,7 +142,7 @@ contract RedemptionTest is Test {
 
     // current TRSRY total = 1M DAI, 2M USDC
     // user1 holds 200k/1M tokens = 20% of TRSRY = 200k DAI, 400k USDC
-    // redeeming 20% * 95% * (200 DAI, 200k USDC) = 190k DAI, 380k USDC
+    // redeeming 20% * 95% * (200k DAI, 200k USDC) = 190k DAI, 380k USDC
     assertEq(DAI.balanceOf(user1), 190_000*1e18);
     assertEq(DAI.balanceOf(address(TRSRY)), 810_000*1e18);
     

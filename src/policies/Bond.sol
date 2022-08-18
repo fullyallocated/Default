@@ -106,6 +106,9 @@ contract Bond is Policy, IBond {
     // time elasped since the previous sale. Each token purchased increases the price of
     // each subsequent token, and the price goes down linearly over time.
 
+    /// @param tokensPurchased_ The integer amount of tokens to purchase
+    /// @return totalCost the total cost in dollars. $1 = 1e6.
+    /// @return newBasePrice the new base price in dollars. $1 = 1e6.
     function getTotalCost(uint256 tokensPurchased_) public view returns (uint256 totalCost, uint256 newBasePrice) {
         // price decay in cents, decays $ // maximum amount of liquidity that can be 0.25 per day ($0.01c every 3456 seconds, or ~57 minutes)
         uint256 priceDecay = (block.timestamp - prevSaleTimestamp) * PRICE_DECAY_RATE / 1 days;
@@ -121,7 +124,8 @@ contract Bond is Policy, IBond {
         newBasePrice = finalPrice;
     }
 
-
+    /// @param tokensPurchased_ the integer amount of tokens to purchase
+    /// @param maxPrice_ the price in dollars. $1 = 1e6
     function purchase(uint256 tokensPurchased_, uint256 maxPrice_) external {
 
         uint256 currentInventory = getCurrentInventory();

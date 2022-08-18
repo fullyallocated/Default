@@ -78,11 +78,11 @@ contract BondTest is Test, IBond {
         uint256 startingBalance = DAI.balanceOf(address(user1));
 
         // purchase bond
-        DAI.approve(address(TRSRY), totalCost);
+        DAI.approve(address(TRSRY), totalCost*1e12);
         bond.purchase(amtToPurchase, totalCost);
 
         // assert dai has been transfered
-        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost);
+        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost*1e12);
 
         // assert that votes have been received
         assertEq(
@@ -105,7 +105,7 @@ contract BondTest is Test, IBond {
         // purchase 128500 tokens
         // so if slippage is 15 then
         // ( $1 + (.000015 * 128500) ) => totalCost should equal 2927500
-        DAI.approve(address(TRSRY), totalCost);
+        DAI.approve(address(TRSRY), totalCost*1e12);
         bond.purchase(amtToPurchase1, totalCost);
 
         // current base price is now $2.92
@@ -154,7 +154,7 @@ contract BondTest is Test, IBond {
         assertEq(totalCost, amt * ((bond.basePrice() + newBasePrice) / 2) );
 
         // purchase 100k bonds
-        DAI.approve(address(TRSRY), totalCost);
+        DAI.approve(address(TRSRY), totalCost*1e12);
         bond.purchase(amt, totalCost);
 
         // basePrice() return value should equal newBasePrice from
@@ -180,7 +180,7 @@ contract BondTest is Test, IBond {
         (uint256 totalCost, uint256 newBasePrice) = bond.getTotalCost(amt);
         
         // simulate large purchase
-        DAI.approve(address(TRSRY), totalCost);
+        DAI.approve(address(TRSRY), totalCost*1e12);
         bond.purchase(amt, totalCost);
 
         // let price decay to the reserve price
@@ -207,11 +207,11 @@ contract BondTest is Test, IBond {
         (uint256 totalCost1, ) = bond.getTotalCost(amtToPurchase1);
 
         // bond purchase order #1
-        DAI.approve(address(TRSRY), totalCost1);
+        DAI.approve(address(TRSRY), totalCost1*1e12);
         bond.purchase(amtToPurchase1, totalCost1);
 
         // assert dai has been transfered
-        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost1);
+        assertEq(DAI.balanceOf(address(user1)), startingBalance - totalCost1*1e12);
 
         // assert that votes have been received
         assertEq(
@@ -225,13 +225,13 @@ contract BondTest is Test, IBond {
         (uint256 totalCost2,) = bond.getTotalCost(amtToPurchase2);
 
         // bond purchase order #2
-        DAI.approve(address(TRSRY), totalCost2);
+        DAI.approve(address(TRSRY), totalCost2*1e12);
         bond.purchase(amtToPurchase2, totalCost2);
 
         // assert dai has been transfered
         assertEq(
             DAI.balanceOf(address(user1)),
-            startingBalance - totalCost1 - totalCost2
+            startingBalance - totalCost1*1e12 - totalCost2*1e12
         );
 
         // assert that votes have been received
@@ -246,13 +246,13 @@ contract BondTest is Test, IBond {
         (uint256 totalCost3,) = bond.getTotalCost(amtToPurchase3);
 
         // bond purchase order #3
-        DAI.approve(address(TRSRY), totalCost3);
+        DAI.approve(address(TRSRY), totalCost3*1e12);
         bond.purchase(amtToPurchase3, totalCost3);
 
         // assert dai has been transfered
         assertEq(
             DAI.balanceOf(address(user1)),
-            startingBalance - totalCost1 - totalCost2 - totalCost3
+            startingBalance - totalCost1*1e12 - totalCost2*1e12 - totalCost3*1e12
         );
 
         // assert that votes have been received

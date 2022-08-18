@@ -52,7 +52,7 @@ contract Redemption is Policy, IRedemption {
     //                                Policy Variables                             //
     /////////////////////////////////////////////////////////////////////////////////
 
-
+    /// @param amount_ the amount of VOTES to redeem for TRSRY assets
     function redeem(uint256 amount_) external {
         ERC20[] memory reserveAssets = TRSRY.getReserveAssets();
         
@@ -65,9 +65,11 @@ contract Redemption is Policy, IRedemption {
         for (uint i; i < numReserveAssets;) {
             ERC20 asset = reserveAssets[i];
 
-            uint256 trsryAssetBalance = asset.balanceOf(address(TRSRY)); 
+            uint256 trsryAssetBalance = asset.balanceOf(address(TRSRY));
 
-            uint256 amtToRedeem = 95 * trsryAssetBalance * amount_ / (100 * totalVotes); // 95% of user's share of votes for a particular asset => i.e. 5% redemption fee.
+            // 95% of user's share of votes for a particular asset => i.e. 5% redemption fee.
+            uint256 amtToRedeem = (trsryAssetBalance * amount_ * 95) / (totalVotes * 100);
+
             TRSRY.withdraw(asset, amtToRedeem);
 
             asset.transfer(msg.sender, amtToRedeem); 

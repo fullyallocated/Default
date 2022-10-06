@@ -103,7 +103,7 @@ contract Bond is Policy, IBond {
     // PRICE
 
     // The auction price is a factor of two variables how many tokens are purchased and 
-    // time elasped since the previous sale. Each token purchased increases the price of
+    // time elapsed since the previous sale. Each token purchased increases the price of
     // each subsequent token, and the price goes down linearly over time.
 
     /// @param tokensPurchased_ The integer amount of tokens to purchase

@@ -56,7 +56,7 @@ contract Redemption is Policy, IRedemption {
     function redeem(uint256 amount_) external {
         ERC20[] memory reserveAssets = TRSRY.getReserveAssets();
         
-        // burn the votes that are being redeemd
+        // burn the votes that are being redeemed
         uint256 totalVotes = VOTES.totalSupply();
         VOTES.burnFrom(msg.sender, amount_);
 

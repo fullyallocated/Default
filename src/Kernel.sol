@@ -144,7 +144,7 @@ contract Kernel {
     mapping(Keycode => mapping(Policy => uint256)) public getDependentIndex;
 
     // Module <> Policy Permissions. Policy -> Keycode -> Function Selector -> Permission
-    mapping(Keycode => mapping(Policy => mapping(bytes4 => bool))) public modulePermissions; // for policy addr, check if they have permission to call the function int he module
+    mapping(Keycode => mapping(Policy => mapping(bytes4 => bool))) public modulePermissions; // for policy addr, check if they have permission to call the function in the module
 
     // List of all active policies
     Policy[] public activePolicies;
